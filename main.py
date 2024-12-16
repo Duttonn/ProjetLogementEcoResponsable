@@ -18,6 +18,20 @@ templates = Jinja2Templates(directory="templates")
 
 database = "logement.db"
 
+from datetime import datetime
+
+# Filtre pour formater la date
+def date_format(value):
+    try:
+        date_obj = datetime.strptime(value, "%Y-%m-%d")
+        return date_obj.strftime("%a %d/%m")  # Format "Lun 16/12"
+    except:
+        return value
+
+templates.env.filters["date_format"] = date_format
+
+
+
 # Connexion à la base de données
 def get_db_connection():
     conn = sqlite3.connect(database)
@@ -343,38 +357,44 @@ async def consommation(request: Request):
     conn.close()
     chart_data = [["Type", "Montant"]] + [[invoice["type"], invoice["total_amount"]] for invoice in invoices]
     return templates.TemplateResponse("consommation.html", {"request": request, "chart_data": chart_data})
+
 @app.get("/meteo", response_class=HTMLResponse)
 async def meteo(request: Request):
     base_url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": 48.8566,  # Paris
         "longitude": 2.3522,
-        "hourly": "temperature_2m,precipitation_probability",
         "daily": "temperature_2m_max,temperature_2m_min,weathercode",
+        "hourly": "temperature_2m,precipitation_probability",
         "timezone": "Europe/Paris",
     }
     async with httpx.AsyncClient() as client:
         response = await client.get(base_url, params=params)
         data = response.json()
 
-    # Récupérer les prévisions quotidiennes et horaires
-    daily_forecast = data.get("daily", {})
-    hourly_forecast = data.get("hourly", {})
-
-    forecast_data = {
-        "daily": {
-            "dates": daily_forecast["time"],
-            "max_temp": daily_forecast["temperature_2m_max"],
-            "min_temp": daily_forecast["temperature_2m_min"],
-        },
-        "hourly": {
-            "times": hourly_forecast["time"],
-            "temperatures": hourly_forecast["temperature_2m"],
-            "precipitations": hourly_forecast["precipitation_probability"],
-        }
+    # Mapping codes météo vers les GIFs
+    weather_code_map = {
+        0: "soleil.gif", 1: "soleil.gif", 2: "nuage.gif", 3: "nuage.gif",
+        45: "brouillard.gif", 48: "brouillard.gif",
+        51: "pluie.gif", 53: "pluie.gif", 55: "pluie.gif",
+        61: "pluie.gif", 63: "forte_pluie.gif", 65: "forte_pluie.gif",
+        80: "pluie.gif", 95: "orage.gif", 96: "neige.gif", 99: "neige.gif"
     }
 
-    return templates.TemplateResponse("meteo.html", {"request": request, "forecast": forecast_data})
+    # Construction de la réponse
+    forecast = {
+        "dates": data["daily"]["time"],
+        "max_temp": data["daily"]["temperature_2m_max"],
+        "min_temp": data["daily"]["temperature_2m_min"],
+        "icons": [weather_code_map.get(code, "inconnu.gif") for code in data["daily"]["weathercode"]],
+        "hourly": {
+            "times": data["hourly"]["time"],
+            "temperatures": data["hourly"]["temperature_2m"],
+            "precipitations": data["hourly"]["precipitation_probability"]
+        }
+    }
+    return templates.TemplateResponse("meteo.html", {"request": request, "forecast": forecast})
+
 
 
 if __name__ == "__main__":
