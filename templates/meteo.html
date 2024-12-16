@@ -1,88 +1,131 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Météo Détail</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        h1 { text-align: center; color: #333; }
-        .menu-container { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
-        .menu-item { padding: 10px; cursor: pointer; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9; }
-        .menu-item:hover { background-color: #e0e0e0; }
-        .active { background-color: #ffc107; }
-        .chart-container { width: 80%; margin: auto; }
-    </style>
-</head>
-<body>
-    <h1>Prévisions Météo pour Paris</h1>
+{% extends "layout.html" %}
 
-    <!-- Menu des jours -->
-    <div class="menu-container" id="menu">
-        {% for i in range(forecast.daily.dates|length) %}
-        <div class="menu-item" onclick="updateChart('{{ i }}')" id="day-{{ i }}">
-            <p>{{ forecast.daily.dates[i] }}</p>
-            <p>Max: {{ forecast.daily.max_temp[i] }}°C</p>
-            <p>Min: {{ forecast.daily.min_temp[i] }}°C</p>
-        </div>
-        {% endfor %}
+{% block title %}Prévisions Météo{% endblock %}
+
+{% block extra_css %}
+<style>
+    .menu-container {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+    .menu-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background-color: #f9f9f9;
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        transition: transform 0.3s, box-shadow 0.3s, background-color 0.3s;
+        width: 100px;
+    }
+    .menu-item img {
+        width: 50px;
+        height: 50px;
+    }
+    .menu-item:hover {
+        transform: scale(1.05);
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.2);
+    }
+    .active {
+        background-color: #4caf50; /* Vert vif */
+        color: white;
+    }
+    .chart-container {
+        width: 70%; /* Réduction supplémentaire */
+        margin: 0 auto;
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    h2 {
+        color: #2c5d3f; /* Vert foncé */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2>Prévisions Météo pour Paris</h2>
+
+<!-- Menu des jours avec GIFs météo -->
+<div class="menu-container" id="menu">
+    {% for i in range(forecast.dates|length) %}
+    <div class="menu-item" onclick="updateChart('{{ i }}')" id="day-{{ i }}">
+        <p>{{ forecast.dates[i] | date_format }}</p>
+        <img src="/static/icons/{{ forecast.icons[i] }}" alt="Météo">
+        <p>Max: {{ forecast.max_temp[i] }}°C</p>
+        <p>Min: {{ forecast.min_temp[i] }}°C</p>
     </div>
+    {% endfor %}
+</div>
 
-    <!-- Graphique détaillé -->
-    <div class="chart-container">
-        <canvas id="weatherChart"></canvas>
-    </div>
+<!-- Graphique détaillé -->
+<div class="chart-container">
+    <canvas id="weatherChart"></canvas>
+</div>
+{% endblock %}
 
-    <script>
-        const forecast = {{ forecast | tojson }};
-        const ctx = document.getElementById("weatherChart").getContext("2d");
-        let weatherChart;
+{% block extra_js %}
+<script>
+    const forecast = {{ forecast | tojson }};
+    const ctx = document.getElementById("weatherChart").getContext("2d");
+    let weatherChart;
 
-        // Fonction pour mettre à jour le graphique
-        function updateChart(dayIndex) {
-            const times = forecast.hourly.times.filter(t => t.startsWith(forecast.daily.dates[dayIndex]));
-            const temperatures = forecast.hourly.temperatures.slice(24 * dayIndex, 24 * (dayIndex + 1));
-            const precipitations = forecast.hourly.precipitations.slice(24 * dayIndex, 24 * (dayIndex + 1));
+    // Fonction pour mettre à jour le graphique
+    function updateChart(dayIndex) {
+        const times = forecast.hourly.times.filter(t => t.startsWith(forecast.dates[dayIndex]));
+        const temperatures = forecast.hourly.temperatures.slice(24 * dayIndex, 24 * (dayIndex + 1));
+        const precipitations = forecast.hourly.precipitations.slice(24 * dayIndex, 24 * (dayIndex + 1));
 
-            if (weatherChart) weatherChart.destroy();
+        if (weatherChart) weatherChart.destroy();
 
-            weatherChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: times.map(t => t.split("T")[1]),  // Afficher les heures seulement
-                    datasets: [
-                        {
-                            label: "Température (°C)",
-                            data: temperatures,
-                            borderColor: "orange",
-                            fill: false
-                        },
-                        {
-                            label: "Précipitation (%)",
-                            data: precipitations,
-                            borderColor: "blue",
-                            fill: false
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { position: "top" }},
-                    scales: {
-                        y: { beginAtZero: true },
-                        x: { title: { display: true, text: "Heures" }}
+        weatherChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: times.map(t => t.split("T")[1]),
+                datasets: [
+                    {
+                        label: "Température (°C)",
+                        data: temperatures,
+                        borderColor: "#ff9800",
+                        backgroundColor: "#ff9800",
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        fill: false
+                    },
+                    {
+                        label: "Précipitation (%)",
+                        data: precipitations,
+                        borderColor: "#2196f3",
+                        backgroundColor: "#2196f3",
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        fill: false
                     }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: "top" }},
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: "Valeurs" }},
+                    x: { title: { display: true, text: "Heures" }}
                 }
-            });
+            }
+        });
 
-            // Marquer l'élément actif
-            document.querySelectorAll('.menu-item').forEach(e => e.classList.remove('active'));
-            document.getElementById(`day-${dayIndex}`).classList.add('active');
-        }
+        // Marquer le jour sélectionné
+        document.querySelectorAll('.menu-item').forEach(e => e.classList.remove('active'));
+        document.getElementById(`day-${dayIndex}`).classList.add('active');
+    }
 
-        // Initialisation : charger les données du premier jour
-        updateChart(0);
-    </script>
-</body>
-</html>
+    // Initialiser avec le premier jour
+    updateChart(0);
+</script>
+{% endblock %}
