@@ -1,14 +1,30 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Request, Form
 from pydantic import BaseModel
 import sqlite3
-from typing import List
+from typing import List, Optional, Annotated
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
+from datetime import datetime
+from contextlib import asynccontextmanager
+import httpx
 
 # Initialisation de l'application FastAPI
 app = FastAPI()
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
 database = "logement.db"
 
-# Modèles Pydantic pour validation
+# Connexion à la base de données
+def get_db_connection():
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# Modèles Pydantic
 class Logement(BaseModel):
     address: str
     phone_number: str
@@ -36,22 +52,9 @@ class Sensor(BaseModel):
 class Measurement(BaseModel):
     sensor_id: int
     value: float
+    date: Optional[datetime] = None
 
-# Connexion à la base de données
-def get_db_connection():
-    conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-# Endpoint pour récupérer tous les logements
-@app.get("/logements", response_model=List[Logement])
-def get_logements():
-    conn = get_db_connection()
-    logements = conn.execute("SELECT * FROM Housing").fetchall()
-    conn.close()
-    return [dict(logement) for logement in logements]
-
-# Endpoint pour ajouter un logement
+# Gestion des logements
 @app.post("/logements")
 def add_logement(logement: Logement):
     conn = get_db_connection()
@@ -70,7 +73,13 @@ def add_logement(logement: Logement):
         conn.close()
     return {"message": "Logement ajouté avec succès."}
 
-# Endpoint pour supprimer un logement et ses données associées
+@app.get("/logements", response_model=List[Logement])
+def get_logements():
+    conn = get_db_connection()
+    logements = conn.execute("SELECT * FROM Housing").fetchall()
+    conn.close()
+    return [dict(logement) for logement in logements]
+
 @app.delete("/logements/{housing_id}")
 def delete_logement(housing_id: int):
     conn = get_db_connection()
@@ -87,7 +96,6 @@ def delete_logement(housing_id: int):
         conn.close()
     return {"message": "Logement et ses données associées supprimés avec succès."}
 
-# Endpoint pour modifier un logement
 @app.put("/logements/{housing_id}")
 def update_logement(housing_id: int, logement: Logement):
     conn = get_db_connection()
@@ -106,7 +114,7 @@ def update_logement(housing_id: int, logement: Logement):
         conn.close()
     return {"message": "Logement mis à jour avec succès."}
 
-# Endpoint pour récupérer les factures
+# Gestion des factures
 @app.get("/invoices", response_model=List[Invoice])
 def get_invoices():
     conn = get_db_connection()
@@ -114,7 +122,6 @@ def get_invoices():
     conn.close()
     return [dict(invoice) for invoice in invoices]
 
-# Endpoint pour ajouter une facture
 @app.post("/invoices")
 def add_invoice(invoice: Invoice):
     conn = get_db_connection()
@@ -133,7 +140,6 @@ def add_invoice(invoice: Invoice):
         conn.close()
     return {"message": "Facture ajoutée avec succès."}
 
-# Endpoint pour supprimer une facture
 @app.delete("/invoices/{invoice_id}")
 def delete_invoice(invoice_id: int):
     conn = get_db_connection()
@@ -146,7 +152,6 @@ def delete_invoice(invoice_id: int):
         conn.close()
     return {"message": "Facture supprimée avec succès."}
 
-# Endpoint pour modifier une facture
 @app.put("/invoices/{invoice_id}")
 def update_invoice(invoice_id: int, invoice: Invoice):
     conn = get_db_connection()
@@ -165,7 +170,7 @@ def update_invoice(invoice_id: int, invoice: Invoice):
         conn.close()
     return {"message": "Facture mise à jour avec succès."}
 
-# Endpoint pour récupérer les pièces
+# Gestion des pièces
 @app.get("/rooms", response_model=List[Room])
 def get_rooms():
     conn = get_db_connection()
@@ -173,7 +178,6 @@ def get_rooms():
     conn.close()
     return [dict(room) for room in rooms]
 
-# Endpoint pour ajouter une pièce
 @app.post("/rooms")
 def add_room(room: Room):
     conn = get_db_connection()
@@ -192,7 +196,6 @@ def add_room(room: Room):
         conn.close()
     return {"message": "Pièce ajoutée avec succès."}
 
-# Endpoint pour supprimer une pièce
 @app.delete("/rooms/{room_id}")
 def delete_room(room_id: int):
     conn = get_db_connection()
@@ -205,7 +208,6 @@ def delete_room(room_id: int):
         conn.close()
     return {"message": "Pièce supprimée avec succès."}
 
-# Endpoint pour modifier une pièce
 @app.put("/rooms/{room_id}")
 def update_room(room_id: int, room: Room):
     conn = get_db_connection()
@@ -224,7 +226,7 @@ def update_room(room_id: int, room: Room):
         conn.close()
     return {"message": "Pièce mise à jour avec succès."}
 
-# Endpoint pour récupérer les capteurs
+# Gestion des capteurs
 @app.get("/sensors", response_model=List[Sensor])
 def get_sensors():
     conn = get_db_connection()
@@ -232,7 +234,6 @@ def get_sensors():
     conn.close()
     return [dict(sensor) for sensor in sensors]
 
-# Endpoint pour ajouter un capteur
 @app.post("/sensors")
 def add_sensor(sensor: Sensor):
     conn = get_db_connection()
@@ -251,7 +252,6 @@ def add_sensor(sensor: Sensor):
         conn.close()
     return {"message": "Capteur ajouté avec succès."}
 
-# Endpoint pour supprimer un capteur
 @app.delete("/sensors/{sensor_id}")
 def delete_sensor(sensor_id: int):
     conn = get_db_connection()
@@ -264,7 +264,6 @@ def delete_sensor(sensor_id: int):
         conn.close()
     return {"message": "Capteur supprimé avec succès."}
 
-# Endpoint pour modifier un capteur
 @app.put("/sensors/{sensor_id}")
 def update_sensor(sensor_id: int, sensor: Sensor):
     conn = get_db_connection()
@@ -283,7 +282,7 @@ def update_sensor(sensor_id: int, sensor: Sensor):
         conn.close()
     return {"message": "Capteur mis à jour avec succès."}
 
-# Endpoint pour ajouter une mesure
+# Gestion des mesures
 @app.post("/measurements")
 def add_measurement(measurement: Measurement):
     conn = get_db_connection()
@@ -302,7 +301,6 @@ def add_measurement(measurement: Measurement):
         conn.close()
     return {"message": "Mesure ajoutée avec succès."}
 
-# Endpoint pour supprimer une mesure
 @app.delete("/measurements/{measurement_id}")
 def delete_measurement(measurement_id: int):
     conn = get_db_connection()
@@ -315,7 +313,6 @@ def delete_measurement(measurement_id: int):
         conn.close()
     return {"message": "Mesure supprimée avec succès."}
 
-# Endpoint pour modifier une mesure
 @app.put("/measurements/{measurement_id}")
 def update_measurement(measurement_id: int, measurement: Measurement):
     conn = get_db_connection()
@@ -333,3 +330,53 @@ def update_measurement(measurement_id: int, measurement: Measurement):
     finally:
         conn.close()
     return {"message": "Mesure mise à jour avec succès."}
+
+
+# Consommation et météo dynamiques
+@app.get("/consommation", response_class=HTMLResponse)
+async def consommation(request: Request):
+    conn = get_db_connection()
+    query = """
+    SELECT type, SUM(amount) as total_amount FROM Invoice GROUP BY type
+    """
+    invoices = conn.execute(query).fetchall()
+    conn.close()
+    chart_data = [["Type", "Montant"]] + [[invoice["type"], invoice["total_amount"]] for invoice in invoices]
+    return templates.TemplateResponse("consommation.html", {"request": request, "chart_data": chart_data})
+@app.get("/meteo", response_class=HTMLResponse)
+async def meteo(request: Request):
+    base_url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": 48.8566,  # Paris
+        "longitude": 2.3522,
+        "hourly": "temperature_2m,precipitation_probability",
+        "daily": "temperature_2m_max,temperature_2m_min,weathercode",
+        "timezone": "Europe/Paris",
+    }
+    async with httpx.AsyncClient() as client:
+        response = await client.get(base_url, params=params)
+        data = response.json()
+
+    # Récupérer les prévisions quotidiennes et horaires
+    daily_forecast = data.get("daily", {})
+    hourly_forecast = data.get("hourly", {})
+
+    forecast_data = {
+        "daily": {
+            "dates": daily_forecast["time"],
+            "max_temp": daily_forecast["temperature_2m_max"],
+            "min_temp": daily_forecast["temperature_2m_min"],
+        },
+        "hourly": {
+            "times": hourly_forecast["time"],
+            "temperatures": hourly_forecast["temperature_2m"],
+            "precipitations": hourly_forecast["precipitation_probability"],
+        }
+    }
+
+    return templates.TemplateResponse("meteo.html", {"request": request, "forecast": forecast_data})
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
