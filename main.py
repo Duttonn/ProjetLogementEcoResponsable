@@ -128,16 +128,83 @@ def update_logement(housing_id: int, logement: Logement):
         conn.close()
     return {"message": "Logement mis à jour avec succès."}
 
-# Gestion des factures
-@app.get("/invoices", response_model=List[Invoice])
-def get_invoices():
-    conn = get_db_connection()
-    invoices = conn.execute("SELECT * FROM Invoice").fetchall()
-    conn.close()
-    return [dict(invoice) for invoice in invoices]
+# # Gestion des factures
+# @app.get("/invoices", response_model=List[Invoice])
+# def get_invoices():
+#     conn = get_db_connection()
+#     invoices = conn.execute("SELECT * FROM Invoice").fetchall()
+#     conn.close()
+#     return [dict(invoice) for invoice in invoices]
 
-@app.post("/invoices")
-def add_invoice(invoice: Invoice):
+# @app.post("/invoices")
+# def add_invoice(invoice: Invoice):
+#     conn = get_db_connection()
+#     try:
+#         conn.execute(
+#             """
+#             INSERT INTO Invoice (housing_id, type, amount, value)
+#             VALUES (?, ?, ?, ?)
+#             """,
+#             (invoice.housing_id, invoice.type, invoice.amount, invoice.value)
+#         )
+#         conn.commit()
+#     except sqlite3.Error as e:
+#         raise HTTPException(status_code=400, detail=f"Erreur lors de l'insertion: {e}")
+#     finally:
+#         conn.close()
+#     return {"message": "Facture ajoutée avec succès."}
+
+# @app.delete("/invoices/{invoice_id}")
+# def delete_invoice(invoice_id: int):
+#     conn = get_db_connection()
+#     try:
+#         conn.execute("DELETE FROM Invoice WHERE invoice_id = ?", (invoice_id,))
+#         conn.commit()
+#     except sqlite3.Error as e:
+#         raise HTTPException(status_code=400, detail=f"Erreur lors de la suppression: {e}")
+#     finally:
+#         conn.close()
+#     return {"message": "Facture supprimée avec succès."}
+
+# @app.put("/invoices/{invoice_id}")
+# def update_invoice(invoice_id: int, invoice: Invoice):
+#     conn = get_db_connection()
+#     try:
+#         conn.execute(
+#             """
+#             UPDATE Invoice SET housing_id = ?, type = ?, amount = ?, value = ?
+#             WHERE invoice_id = ?
+#             """,
+#             (invoice.housing_id, invoice.type, invoice.amount, invoice.value, invoice_id)
+#         )
+#         conn.commit()
+#     except sqlite3.Error as e:
+#         raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
+#     finally:
+#         conn.close()
+#     return {"message": "Facture mise à jour avec succès."}
+
+@app.get("/visualiser_factures", response_class=HTMLResponse)
+def visualiser_factures(request: Request, id: int = 1):
+    conn = get_db_connection()
+    logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
+    selected_logement = conn.execute("SELECT address FROM Housing WHERE housing_id = ?", (id,)).fetchone()
+    factures = conn.execute("SELECT * FROM Invoice WHERE housing_id = ?", (id,)).fetchall()
+    conn.close()
+
+    return templates.TemplateResponse("visualiser_factures.html", {
+        "request": request,
+        "logements": logements,
+        "factures": factures,
+        "selected_id": id,
+        "selected_logement_address": selected_logement["address"] if selected_logement else "Logement par Défaut"
+    })
+
+
+
+
+@app.post("/factures")
+def ajouter_facture(invoice: Invoice):
     conn = get_db_connection()
     try:
         conn.execute(
@@ -149,40 +216,50 @@ def add_invoice(invoice: Invoice):
         )
         conn.commit()
     except sqlite3.Error as e:
-        raise HTTPException(status_code=400, detail=f"Erreur lors de l'insertion: {e}")
+        raise HTTPException(status_code=400, detail=f"Erreur lors de l'ajout de la facture : {e}")
     finally:
         conn.close()
-    return {"message": "Facture ajoutée avec succès."}
+    return {"message": "Facture ajoutée avec succès"}
+from fastapi.responses import JSONResponse
 
-@app.delete("/invoices/{invoice_id}")
-def delete_invoice(invoice_id: int):
+@app.put("/factures/{invoice_id}")
+def modifier_facture(invoice_id: int, invoice: Invoice):
     conn = get_db_connection()
     try:
-        conn.execute("DELETE FROM Invoice WHERE invoice_id = ?", (invoice_id,))
-        conn.commit()
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=400, detail=f"Erreur lors de la suppression: {e}")
-    finally:
-        conn.close()
-    return {"message": "Facture supprimée avec succès."}
-
-@app.put("/invoices/{invoice_id}")
-def update_invoice(invoice_id: int, invoice: Invoice):
-    conn = get_db_connection()
-    try:
-        conn.execute(
+        result = conn.execute(
             """
-            UPDATE Invoice SET housing_id = ?, type = ?, amount = ?, value = ?
+            UPDATE Invoice 
+            SET housing_id = ?, type = ?, amount = ?, value = ?
             WHERE invoice_id = ?
             """,
             (invoice.housing_id, invoice.type, invoice.amount, invoice.value, invoice_id)
         )
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Facture non trouvée.")
         conn.commit()
     except sqlite3.Error as e:
-        raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
+        raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour de la facture : {e}")
     finally:
         conn.close()
-    return {"message": "Facture mise à jour avec succès."}
+    return JSONResponse(content={"message": "Facture mise à jour avec succès"})
+
+
+
+@app.delete("/factures/{invoice_id}", response_class=HTMLResponse)
+def supprimer_facture(request: Request, invoice_id: int):
+    conn = get_db_connection()
+    try:
+        result = conn.execute("DELETE FROM Invoice WHERE invoice_id = ?", (invoice_id,))
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Facture non trouvée.")
+        conn.commit()
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=400, detail=f"Erreur lors de la suppression de la facture : {e}")
+    finally:
+        conn.close()
+    return templates.TemplateResponse("message.html", {"request": request, "message": "Facture supprimée avec succès"})
+
+
 
 # Gestion des pièces
 @app.get("/rooms", response_model=List[Room])
@@ -345,18 +422,41 @@ def update_measurement(measurement_id: int, measurement: Measurement):
         conn.close()
     return {"message": "Mesure mise à jour avec succès."}
 
-
-# Consommation et météo dynamiques
-@app.get("/consommation", response_class=HTMLResponse)
-async def consommation(request: Request):
+@app.get("/consommation_par_logement", response_class=HTMLResponse)
+def consommation_par_logement(request: Request, logement_id: int = None):
     conn = get_db_connection()
-    query = """
-    SELECT type, SUM(amount) as total_amount FROM Invoice GROUP BY type
-    """
-    invoices = conn.execute(query).fetchall()
+    logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
+
+    if logement_id is None:
+        logement_id = 1  # Sélection par défaut du logement 1
+
+    selected_logement = conn.execute(
+        "SELECT address FROM Housing WHERE housing_id = ?", (logement_id,)
+    ).fetchone()
+
+    factures = conn.execute(
+        "SELECT type, SUM(amount) as total_amount, SUM(value) as total_value "
+        "FROM Invoice WHERE housing_id = ? GROUP BY type", (logement_id,)
+    ).fetchall()
+
+    chart_data = {
+        "amount": [["Type", "Montant"]] + [[row["type"], row["total_amount"]] for row in factures],
+        "value": [["Type", "Valeur"]] + [[row["type"], row["total_value"]] for row in factures],
+    }
+
+    message = "Aucune facture assignée à ce logement." if not factures else ""
     conn.close()
-    chart_data = [["Type", "Montant"]] + [[invoice["type"], invoice["total_amount"]] for invoice in invoices]
-    return templates.TemplateResponse("consommation.html", {"request": request, "chart_data": chart_data})
+
+    return templates.TemplateResponse("consommation_par_logement.html", {
+        "request": request,
+        "logements": logements,
+        "selected_id": logement_id,
+        "selected_logement_address": selected_logement["address"] if selected_logement else "Logement par Défaut",
+        "chart_data": chart_data,
+        "message": message
+    })
+
+
 
 @app.get("/meteo", response_class=HTMLResponse)
 async def meteo(request: Request):
