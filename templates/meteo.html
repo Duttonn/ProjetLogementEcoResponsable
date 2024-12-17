@@ -11,6 +11,7 @@
         flex-wrap: wrap;
         margin-bottom: 20px;
     }
+
     .menu-item {
         display: flex;
         flex-direction: column;
@@ -24,28 +25,50 @@
         transition: transform 0.3s, box-shadow 0.3s, background-color 0.3s;
         width: 100px;
     }
+
     .menu-item img {
         width: 50px;
         height: 50px;
     }
+
     .menu-item:hover {
         transform: scale(1.05);
         box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.2);
     }
+
     .active {
-        background-color: #4caf50; /* Vert vif */
+        background-color: #4caf50;
         color: white;
     }
+
     .chart-container {
-        width: 70%; /* Réduction supplémentaire */
+        width: 70%;
         margin: 0 auto;
         background: white;
         border-radius: 10px;
         padding: 15px;
         box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        position: relative;
     }
-    h2 {
-        color: #2c5d3f; /* Vert foncé */
+
+    .current-marker {
+        position: absolute;
+        background-color: rgba(76, 175, 80, 0.2);
+        /* Vert semi-transparent */
+        color: white;
+        padding: 5px;
+        border-radius: 5px;
+        font-size: 12px;
+        transform: translate(-50%, -120%);
+        display: none;
+        /* pointer-events: none; */
+    }
+
+    #currentMarker:hover {
+        background-color: rgba(76, 175, 80, 1);
+        /* Vert opaque au survol */
+        opacity: 1;
+        /* Complètement opaque */
     }
 </style>
 {% endblock %}
@@ -53,7 +76,6 @@
 {% block content %}
 <h2>Prévisions Météo pour Paris</h2>
 
-<!-- Menu des jours avec GIFs météo -->
 <div class="menu-container" id="menu">
     {% for i in range(forecast.dates|length) %}
     <div class="menu-item" onclick="updateChart('{{ i }}')" id="day-{{ i }}">
@@ -65,30 +87,42 @@
     {% endfor %}
 </div>
 
-<!-- Graphique détaillé -->
 <div class="chart-container">
     <canvas id="weatherChart"></canvas>
+    <div id="currentMarker" class="current-marker"></div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const forecast = {{ forecast | tojson }};
     const ctx = document.getElementById("weatherChart").getContext("2d");
+    const marker = document.getElementById("currentMarker");
     let weatherChart;
 
-    // Fonction pour mettre à jour le graphique
+    // Fonction pour trouver l'index de l'heure actuelle
+    function getCurrentHourIndex(times) {
+        const now = new Date();
+        const currentHour = now.getHours().toString().padStart(2, "0") + ":00";
+        return times.indexOf(currentHour);
+    }
+
+    // Mettre à jour le graphique
     function updateChart(dayIndex) {
-        const times = forecast.hourly.times.filter(t => t.startsWith(forecast.dates[dayIndex]));
+        const times = forecast.hourly.times.filter(t => t.startsWith(forecast.dates[dayIndex]))
+            .map(t => t.split("T")[1]);
         const temperatures = forecast.hourly.temperatures.slice(24 * dayIndex, 24 * (dayIndex + 1));
         const precipitations = forecast.hourly.precipitations.slice(24 * dayIndex, 24 * (dayIndex + 1));
 
         if (weatherChart) weatherChart.destroy();
 
+        const currentHourIndex = getCurrentHourIndex(times);
+
         weatherChart = new Chart(ctx, {
-            type: 'line',
+            type: "line",
             data: {
-                labels: times.map(t => t.split("T")[1]),
+                labels: times,
                 datasets: [
                     {
                         label: "Température (°C)",
@@ -97,35 +131,59 @@
                         backgroundColor: "#ff9800",
                         pointRadius: 4,
                         pointHoverRadius: 6,
-                        fill: false
+                        fill: false,
                     },
                     {
-                        label: "Précipitation (%)",
+                        label: "Précipitations (%)",
                         data: precipitations,
                         borderColor: "#2196f3",
                         backgroundColor: "#2196f3",
                         pointRadius: 4,
                         pointHoverRadius: 6,
-                        fill: false
+                        fill: false,
                     }
-                ]
+                ],
             },
             options: {
                 responsive: true,
-                plugins: { legend: { position: "top" }},
+                plugins: { legend: { position: "top" } },
                 scales: {
-                    y: { beginAtZero: true, title: { display: true, text: "Valeurs" }},
-                    x: { title: { display: true, text: "Heures" }}
-                }
+                    y: { beginAtZero: true, title: { display: true, text: "Valeurs" } },
+                    x: { title: { display: true, text: "Heures" } },
+                },
+                onHover: (event) => handleMouseMove(event, times, temperatures, precipitations),
             }
         });
 
-        // Marquer le jour sélectionné
-        document.querySelectorAll('.menu-item').forEach(e => e.classList.remove('active'));
-        document.getElementById(`day-${dayIndex}`).classList.add('active');
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+
+        // Calculer l'avancement horaire (fraction du jour écoulée)
+        const hourProgress = currentHour / 24 + currentMinute / (24 * 60);
+
+        // Récupérer la largeur du graphique
+        const chartArea = weatherChart.chartArea;
+        const graphWidth = chartArea.right - chartArea.left;
+
+        // Calculer la position X de l'étiquette
+        const markerX = chartArea.left + graphWidth * hourProgress;
+
+        // Mettre à jour la position de l'étiquette
+        marker.style.left = `${markerX}px`;
+        marker.style.display = "block";
+        marker.innerHTML = `
+    Heure: ${currentHour.toString().padStart(2, "0")}:${currentMinute.toString().padStart(2, "0")}<br>
+    Température: ${temperatures[currentHour]}°C<br>
+    Précipitations: ${precipitations[currentHour]}%
+`;
+
     }
 
-    // Initialiser avec le premier jour
+    function handleMouseMove(event, times, temperatures, precipitations) {
+        // Ici, tu peux gérer d'autres événements si nécessaire
+    }
+
     updateChart(0);
 </script>
 {% endblock %}
