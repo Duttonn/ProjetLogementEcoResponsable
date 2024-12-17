@@ -1,0 +1,134 @@
+{% extends "layout.html" %}
+
+{% block title %}Consommation Énergétique{% endblock %}
+
+{% block extra_css %}
+<style>
+    .container {
+        display: flex;
+        height: 90vh;
+    }
+
+    .menu {
+        width: 200px;
+        background-color: #e8f5e9;
+        padding: 15px;
+        border-right: 2px solid #c8e6c9;
+    }
+
+    .menu-item {
+        background-color: #c8e6c9;
+        padding: 10px;
+        margin: 10px 0;
+        text-align: center;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: transform 0.3s, background 0.3s;
+    }
+
+    .menu-item:hover, .menu-item.active {
+        background-color: #4caf50;
+        color: white;
+        transform: scale(1.05);
+    }
+
+    .content {
+        flex: 1;
+        padding: 20px;
+    }
+
+    .chart-toggle {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+    .chart-toggle button {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        margin: 0 10px;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .chart-toggle button:hover {
+        background-color: #45a049;
+        transform: scale(1.05);
+    }
+
+    #chart_div {
+        width: 800px;
+        height: 500px;
+        margin: auto;
+    }
+
+    p.message {
+        color: red;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Menu Vertical -->
+    <div class="menu">
+        {% for logement in logements %}
+        <div class="menu-item {% if logement.housing_id == selected_id %}active{% endif %}"
+             onclick="location.href='?logement_id={{ logement.housing_id }}'">
+            {{ logement.address }}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Contenu Principal -->
+    <div class="content">
+        <h2>Consommation de {{ selected_logement_address or 'Logement par Défaut' }}</h2>
+
+        {% if message %}
+        <p class="message">{{ message }}</p>
+        {% else %}
+        <div class="chart-toggle">
+            <button onclick="setChartType('amount')">Montant des Factures</button>
+            <button onclick="setChartType('value')">Valeur des Factures</button>
+        </div>
+
+        <div id="chart_div"></div>
+        {% endif %}
+
+        <p style="text-align: center; margin-top: 20px;">
+            <a href="/visualiser_factures" class="btn">Voir les factures</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<script type="text/javascript">
+    google.charts.load('current', {packages: ['corechart']});
+    let currentChartType = 'amount';
+    let chartData = {{ chart_data | tojson }};
+
+    google.charts.setOnLoadCallback(drawChart);
+
+    function drawChart() {
+        const title = currentChartType === 'amount' ? 
+            'Répartition des Montants des Factures' : 
+            'Répartition des Valeurs des Factures';
+
+        const data = google.visualization.arrayToDataTable(chartData[currentChartType]);
+        const options = { title: title };
+        const chart = new google.visualization.PieChart(document.getElementById('chart_div'));
+        chart.draw(data, options);
+    }
+
+    function setChartType(type) {
+        currentChartType = type;
+        drawChart();
+    }
+</script>
+{% endblock %}
