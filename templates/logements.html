@@ -1,0 +1,121 @@
+{% extends "layout.html" %}
+
+{% block title %}Gestion des Logements{% endblock %}
+
+{% block extra_css %}
+<style>
+    .container {
+        display: flex;
+        justify-content: space-between;
+        padding: 20px;
+    }
+
+    .logement-list {
+        flex: 2;
+        margin-right: 20px;
+    }
+
+    .logement-item {
+        background: #e8f5e9;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    
+
+    .form-container {
+        flex: 1;
+        background: #f1f8e9;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    input, button {
+        width: 100%;
+        padding: 5px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+
+    button {
+        background-color: #4caf50;
+        color: white;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    button:hover {
+        background-color: #388e3c;
+        transform: scale(1.05);
+    }
+
+    .counter {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Liste des logements existants -->
+    <div class="logement-list">
+        <h2>Liste des Logements</h2>
+        {% for logement in logements %}
+        <div class="logement-item">
+            <p><strong>Adresse :</strong> {{ logement.address }}</p>
+            <p><strong>Téléphone :</strong> {{ logement.phone_number }}</p>
+            <p><strong>IP :</strong> {{ logement.ip_address }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Formulaire d'ajout d'un logement -->
+    <div class="form-container">
+        <h2>Créer un Nouveau Logement</h2>
+        <form method="POST" action="/logements">
+            <input type="text" name="address" placeholder="Adresse" required>
+            <input type="text" name="phone_number" placeholder="Numéro de Téléphone" required>
+            <input type="text" name="ip_address" placeholder="Adresse IP" required>
+            
+            <label>Nombre de Pièces :</label>
+            <div class="counter">
+                <button type="button" onclick="decrementRooms()">-</button>
+                <span id="roomCounter">1</span>
+                <button type="button" onclick="incrementRooms()">+</button>
+            </div>
+            <input type="hidden" name="room_count" id="roomCount" value="1">
+
+            <button type="submit">Créer Logement</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let roomCount = 1;
+
+    function incrementRooms() {
+        roomCount++;
+        updateRoomCounter();
+    }
+
+    function decrementRooms() {
+        if (roomCount > 1) {
+            roomCount--;
+            updateRoomCounter();
+        }
+    }
+
+    function updateRoomCounter() {
+        document.getElementById("roomCounter").innerText = roomCount;
+        document.getElementById("roomCount").value = roomCount;
+    }
+</script>
+{% endblock %}

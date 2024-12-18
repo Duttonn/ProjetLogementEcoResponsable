@@ -26,7 +26,8 @@
         transition: transform 0.3s, background 0.3s;
     }
 
-    .menu-item:hover, .menu-item.active {
+    .menu-item:hover,
+    .menu-item.active {
         background-color: #4caf50;
         color: white;
         transform: scale(1.05);
@@ -115,10 +116,17 @@
     <div class="menu">
         {% for logement in logements %}
         <div class="menu-item {% if selected_id == logement.housing_id %}active{% endif %}"
-             onclick="location.href='?id={{ logement.housing_id }}'">
+            onclick="location.href='?id={{ logement.housing_id }}'">
             {{ logement.address }}
         </div>
         {% endfor %}
+
+        <!-- Nouveau bouton Ajouter un Logement -->
+        <div class="menu-item" style="background-color: #4caf50; color: white;"
+            onclick="location.href='http://localhost:8000/logements'">
+            + Ajouter un Logement
+        </div>
+
     </div>
 
     <!-- Contenu Principal -->
@@ -137,7 +145,8 @@
             <p><strong>Montant :</strong> {{ facture.amount }} €</p>
             <p><strong>Consommation :</strong> {{ facture.value }}</p>
             <div style="margin-top: 10px;">
-                <button class="btn" onclick="openEditModal('{{ facture.invoice_id }}', '{{ facture.type }}', '{{ facture.amount }}', '{{ facture.value }}')">Modifier</button>
+                <button class="btn"
+                    onclick="openEditModal('{{ facture.invoice_id }}', '{{ facture.type }}', '{{ facture.amount }}', '{{ facture.value }}')">Modifier</button>
                 <button class="btn" onclick="toggleSelection('{{ facture.invoice_id }}')">Sélectionner</button>
             </div>
         </div>
