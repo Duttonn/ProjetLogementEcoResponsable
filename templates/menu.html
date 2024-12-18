@@ -1,0 +1,70 @@
+<nav>
+    <!-- Menu Button -->
+    <div id="menu-button" style="cursor: pointer; padding: 10px; position: absolute; top: 0; left: 0; color: white;" onclick="toggleMenu()">
+        ☰ Menu
+    </div>
+
+    <!-- Sidebar Menu -->
+    <div id="sidebar-menu" style="
+        position: fixed;
+        top: 0;
+        left: -250px; /* Hidden by default */
+        width: 250px;
+        height: 100%;
+        background-color: #4caf50; /* Green Background */
+        color: black; /* Text Color */
+        padding-top: 60px;
+        transition: left 0.3s;
+        z-index: 1000;
+    ">
+        <a href="/logements" class="menu-item">Logements</a>
+        <a href="/visualiser_factures" class="menu-item">Visualiser Factures</a>
+        <a href="/consommation_par_logement" class="menu-item">Consommation par Logement</a>
+        <a href="/rooms" class="menu-item">Rooms</a>
+        <a href="/sensors" class="menu-item">Sensors</a>
+        <a href="/meteo" class="menu-item">Météo</a>
+    </div>
+</nav>
+
+<!-- JavaScript to Handle Sidebar Toggle -->
+<script>
+    function toggleMenu() {
+        const sidebar = document.getElementById('sidebar-menu');
+        const menuButton = document.getElementById('menu-button');
+        
+        if (sidebar.style.left === '0px') {
+            sidebar.style.left = '-250px'; // Close the sidebar
+        } else {
+            sidebar.style.left = '0px'; // Open the sidebar
+        }
+    }
+</script>
+
+<style>
+    /* Menu Button Styling */
+    #menu-button {
+        font-size: 18px;
+        background-color: transparent;
+        border: none;
+        z-index: 1001; /* Ensure it's above the menu */
+    }
+
+    /* Sidebar Menu Item Styling */
+    .menu-item {
+        display: block;
+        padding: 10px 20px;
+        text-decoration: none;
+        color: black; /* Visible on white buttons */
+        font-size: 16px;
+        background-color: white; /* White Buttons */
+        margin: 5px 10px; /* Margin for Spacing */
+        border-radius: 5px; /* Rounded Corners */
+        transition: background 0.2s, color 0.2s;
+    }
+
+    /* Hover Effect */
+    .menu-item:hover {
+        background-color: #388e3c; /* Darker Green */
+        color: white; /* White Text on Hover */
+    }
+</style>
