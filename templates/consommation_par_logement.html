@@ -26,7 +26,8 @@
         transition: transform 0.3s, background 0.3s;
     }
 
-    .menu-item:hover, .menu-item.active {
+    .menu-item:hover,
+    .menu-item.active {
         background-color: #4caf50;
         color: white;
         transform: scale(1.05);
@@ -78,10 +79,17 @@
     <div class="menu">
         {% for logement in logements %}
         <div class="menu-item {% if logement.housing_id == selected_id %}active{% endif %}"
-             onclick="location.href='?logement_id={{ logement.housing_id }}'">
+            onclick="location.href='?logement_id={{ logement.housing_id }}'">
             {{ logement.address }}
         </div>
         {% endfor %}
+
+
+        <!-- Nouveau bouton Ajouter un Logement -->
+        <div class="menu-item" style="background-color: #4caf50; color: white;"
+            onclick="location.href='http://localhost:8000/logements'">
+            + Ajouter un Logement
+        </div>
     </div>
 
     <!-- Contenu Principal -->
@@ -109,15 +117,15 @@
 {% block extra_js %}
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script type="text/javascript">
-    google.charts.load('current', {packages: ['corechart']});
+    google.charts.load('current', { packages: ['corechart'] });
     let currentChartType = 'amount';
     let chartData = {{ chart_data | tojson }};
 
     google.charts.setOnLoadCallback(drawChart);
 
     function drawChart() {
-        const title = currentChartType === 'amount' ? 
-            'Répartition des Montants des Factures' : 
+        const title = currentChartType === 'amount' ?
+            'Répartition des Montants des Factures' :
             'Répartition des Valeurs des Factures';
 
         const data = google.visualization.arrayToDataTable(chartData[currentChartType]);

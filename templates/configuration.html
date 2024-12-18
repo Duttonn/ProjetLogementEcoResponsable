@@ -1,0 +1,281 @@
+{% extends "layout.html" %}
+
+{% block title %}Configuration des Capteurs{% endblock %}
+
+{% block extra_css %}
+<style>
+      .container {
+            display: flex;
+            height: 90vh;
+      }
+
+      .menu {
+            width: 200px;
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-right: 2px solid #c8e6c9;
+      }
+
+      .menu-item {
+            background-color: #c8e6c9;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.3s, background 0.3s;
+      }
+
+      .menu-item:hover,
+      .menu-item.active {
+            background-color: #4caf50;
+            color: white;
+            transform: scale(1.05);
+      }
+
+      .content {
+            flex: 1;
+            padding: 20px;
+      }
+
+      .actions {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+      }
+
+      .btn {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s;
+      }
+
+      .btn:hover {
+            background-color: #45a049;
+            transform: scale(1.05);
+      }
+
+      .tile {
+            display: inline-block;
+            background-color: #f1f8e9;
+            border-radius: 10px;
+            padding: 10px;
+            margin: 10px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            transition: transform 0.3s;
+      }
+
+      .tile:hover {
+            transform: scale(1.05);
+      }
+
+      .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+      }
+
+      .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            width: 300px;
+      }
+
+      .modal-content input {
+            width: 90%;
+            margin: 10px 0;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+      }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+      <!-- Menu Vertical -->
+      <div class="menu">
+            {% for logement in logements %}
+            <div class="menu-item {% if selected_id == logement.housing_id %}active{% endif %}"
+                  onclick="location.href='?id={{ logement.housing_id }}'">
+                  {{ logement.address }}
+            </div>
+            {% endfor %}
+
+            <!-- Nouveau bouton Ajouter un Logement -->
+            <div class="menu-item" style="background-color: #4caf50; color: white;"
+                  onclick="location.href='http://localhost:8000/logements'">
+                  + Ajouter un Logement
+            </div>
+
+      </div>
+
+      <!-- Contenu Principal -->
+      <div class="content">
+            <h2>Capteurs pour {{ selected_logement_address or 'Logement par Défaut' }}</h2>
+
+            <div class="actions">
+                  <button class="btn" onclick="openAddModal()">+ Ajouter un Capteur</button>
+                  <button class="btn" onclick="deleteSelected()">Supprimer</button>
+            </div>
+
+            {% if sensors %}
+            {% for sensor in sensors %}
+            <div class="tile" id="tile-{{ sensor.sensor_id }}">
+                  <h3>Type : {{ sensor.type }}</h3>
+                  <p><strong>Référence :</strong> {{ sensor.commercial_reference }}</p>
+                  <p><strong>Port :</strong> {{ sensor.communication_port }}</p>
+                  <button class="btn"
+                        onclick="openEditModal('{{ sensor.sensor_id }}', '{{ sensor.type }}', '{{ sensor.commercial_reference }}', '{{ sensor.communication_port }}')">Modifier</button>
+                  <button class="btn" onclick="toggleSelection('{{ sensor.sensor_id }}')">Sélectionner</button>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p>Aucun capteur trouvé pour ce logement.</p>
+            {% endif %}
+      </div>
+</div>
+
+<!-- Modal d'Ajout -->
+<div id="addModal" class="modal">
+      <div class="modal-content">
+            <h3>Ajouter un Capteur</h3>
+            <input type="text" id="addType" placeholder="Type">
+            <input type="text" id="addReference" placeholder="Référence">
+            <input type="text" id="addPort" placeholder="Port">
+            <button class="btn" onclick="addSensor()">Ajouter</button>
+            <button class="btn" onclick="closeAddModal()">Annuler</button>
+      </div>
+</div>
+
+<!-- Modal d'Édition -->
+<div id="editModal" class="modal">
+      <div class="modal-content">
+            <h3>Modifier le Capteur</h3>
+            <input type="hidden" id="editSensorId">
+            <input type="text" id="editType" placeholder="Type">
+            <input type="text" id="editReference" placeholder="Référence">
+            <input type="text" id="editPort" placeholder="Port">
+            <button class="btn" onclick="saveChanges()">Enregistrer</button>
+            <button class="btn" onclick="closeEditModal()">Annuler</button>
+      </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+      const selectedSensors = new Set();
+
+      function toggleSelection(sensorId) {
+            const tile = document.getElementById(`tile-${sensorId}`);
+            tile.classList.toggle("selected");
+            if (selectedSensors.has(sensorId)) {
+                  selectedSensors.delete(sensorId);
+            } else {
+                  selectedSensors.add(sensorId);
+            }
+      }
+
+      function deleteSelected() {
+            if (selectedSensors.size === 0) {
+                  alert("Aucun capteur sélectionné.");
+                  return;
+            }
+
+            if (confirm("Voulez-vous vraiment supprimer les capteurs sélectionnés ?")) {
+                  selectedSensors.forEach(async (sensorId) => {
+                        await fetch(`/sensors/${sensorId}`, { method: "DELETE" });
+                  });
+                  alert("Capteurs supprimés !");
+                  window.location.reload();
+            }
+      }
+
+      const addModal = document.getElementById("addModal");
+      const editModal = document.getElementById("editModal");
+
+      function openAddModal() {
+            addModal.style.display = "flex";
+      }
+
+      function closeAddModal() {
+            addModal.style.display = "none";
+      }
+
+      async function addSensor() {
+            const type = document.getElementById("addType").value;
+            const reference = document.getElementById("addReference").value;
+            const port = document.getElementById("addPort").value;
+
+            if (!type || !reference || !port) {
+                  alert("Veuillez remplir tous les champs correctement.");
+                  return;
+            }
+
+            const response = await fetch("/sensors", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                        room_id: 1, // à ajuster en fonction de votre backend
+                        type_id: 1, // à ajuster en fonction de votre backend
+                        commercial_reference: reference,
+                        communication_port: port
+                  })
+            });
+
+            if (response.ok) {
+                  alert("Capteur ajouté avec succès !");
+                  window.location.reload();
+            } else {
+                  alert("Erreur lors de l'ajout du capteur.");
+            }
+            closeAddModal();
+      }
+
+      function openEditModal(id, type, reference, port) {
+            document.getElementById("editSensorId").value = id;
+            document.getElementById("editType").value = type;
+            document.getElementById("editReference").value = reference;
+            document.getElementById("editPort").value = port;
+            editModal.style.display = "flex";
+      }
+
+      function closeEditModal() {
+            editModal.style.display = "none";
+      }
+
+      async function saveChanges() {
+            const id = document.getElementById("editSensorId").value;
+            const type = document.getElementById("editType").value;
+            const reference = document.getElementById("editReference").value;
+            const port = document.getElementById("editPort").value;
+
+            const response = await fetch(`/sensors/${id}`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ room_id: 1, type_id: 1, commercial_reference: reference, communication_port: port })
+            });
+
+            if (response.ok) {
+                  alert("Capteur mis à jour avec succès !");
+                  window.location.reload();
+            } else {
+                  alert("Erreur lors de la mise à jour du capteur.");
+            }
+      }
+</script>
+{% endblock %}

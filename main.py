@@ -68,31 +68,56 @@ class Measurement(BaseModel):
     value: float
     date: Optional[datetime] = None
 
-# Gestion des logements
-@app.post("/logements")
-def add_logement(logement: Logement):
+@app.get("/logements", response_class=HTMLResponse)
+def get_logements(request: Request):
+    conn = get_db_connection()
+    logements = conn.execute("SELECT * FROM Housing").fetchall()
+    conn.close()
+
+    # Rendu de la page HTML avec les logements existants
+    return templates.TemplateResponse("logements.html", {
+        "request": request,
+        "logements": logements
+    })
+
+@app.post("/logements", response_class=HTMLResponse)
+def add_logement(
+    request: Request,
+    address: str = Form(...),
+    phone_number: str = Form(...),
+    ip_address: str = Form(...),
+    room_count: int = Form(...)
+):
     conn = get_db_connection()
     try:
-        conn.execute(
+        # Insérer le logement
+        cursor = conn.execute(
             """
             INSERT INTO Housing (address, phone_number, ip_address)
             VALUES (?, ?, ?)
             """,
-            (logement.address, logement.phone_number, logement.ip_address)
+            (address, phone_number, ip_address)
         )
+        housing_id = cursor.lastrowid  # Récupérer l'ID du logement inséré
+
+        # Ajouter les pièces associées
+        for i in range(1, room_count + 1):
+            room_name = f"Pièce {i}"
+            conn.execute(
+                """
+                INSERT INTO Room (housing_id, name, x, y, z)
+                VALUES (?, ?, 0, 0, 0)
+                """,
+                (housing_id, room_name)
+            )
         conn.commit()
     except sqlite3.Error as e:
         raise HTTPException(status_code=400, detail=f"Erreur lors de l'insertion: {e}")
     finally:
         conn.close()
-    return {"message": "Logement ajouté avec succès."}
 
-@app.get("/logements", response_model=List[Logement])
-def get_logements():
-    conn = get_db_connection()
-    logements = conn.execute("SELECT * FROM Housing").fetchall()
-    conn.close()
-    return [dict(logement) for logement in logements]
+    # Après l'insertion, on recharge la même page
+    return get_logements(request)
 
 @app.delete("/logements/{housing_id}")
 def delete_logement(housing_id: int):
@@ -260,14 +285,22 @@ def supprimer_facture(request: Request, invoice_id: int):
     return templates.TemplateResponse("message.html", {"request": request, "message": "Facture supprimée avec succès"})
 
 
-
-# Gestion des pièces
-@app.get("/rooms", response_model=List[Room])
-def get_rooms():
+@app.get("/rooms/{housing_id}", response_class=HTMLResponse)
+def get_rooms_for_housing(request: Request, housing_id: int):
     conn = get_db_connection()
-    rooms = conn.execute("SELECT * FROM Room").fetchall()
+    logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
+    rooms = conn.execute("SELECT * FROM Room WHERE housing_id = ?", (housing_id,)).fetchall()
+    logement_address = next((logement["address"] for logement in logements if logement["housing_id"] == housing_id), "Logement par Défaut")
     conn.close()
-    return [dict(room) for room in rooms]
+
+    return templates.TemplateResponse("rooms.html", {
+        "request": request,
+        "logements": logements,
+        "rooms": rooms,
+        "selected_id": housing_id,
+        "selected_logement_address": logement_address
+    })
+
 
 @app.post("/rooms")
 def add_room(room: Room):
@@ -317,13 +350,13 @@ def update_room(room_id: int, room: Room):
         conn.close()
     return {"message": "Pièce mise à jour avec succès."}
 
-# Gestion des capteurs
-@app.get("/sensors", response_model=List[Sensor])
-def get_sensors():
-    conn = get_db_connection()
-    sensors = conn.execute("SELECT * FROM Sensor").fetchall()
-    conn.close()
-    return [dict(sensor) for sensor in sensors]
+# # Gestion des capteurs
+# @app.get("/sensors", response_model=List[Sensor])
+# def get_sensors():
+#     conn = get_db_connection()
+#     sensors = conn.execute("SELECT * FROM Sensor").fetchall()
+#     conn.close()
+#     return [dict(sensor) for sensor in sensors]
 
 @app.post("/sensors")
 def add_sensor(sensor: Sensor):
@@ -454,6 +487,59 @@ def consommation_par_logement(request: Request, logement_id: int = None):
         "selected_logement_address": selected_logement["address"] if selected_logement else "Logement par Défaut",
         "chart_data": chart_data,
         "message": message
+    })
+
+
+@app.get("/configuration", response_class=HTMLResponse)
+def configuration(request: Request):
+    conn = get_db_connection()
+    logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
+    sensors = conn.execute("SELECT * FROM Sensor").fetchall()
+    conn.close()
+
+    return templates.TemplateResponse("configuration.html", {
+        "request": request,
+        "logements": logements,
+        "sensors": sensors
+    })
+
+
+@app.get("/economies_realisees", response_class=HTMLResponse)
+def economies_realisees(request: Request, logement_id: int = None):
+    conn = get_db_connection()
+    logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
+
+    if logement_id is None:
+        logement_id = 1  # Sélection par défaut du logement 1
+
+    selected_logement = conn.execute(
+        "SELECT address FROM Housing WHERE housing_id = ?", (logement_id,)
+    ).fetchone()
+
+    factures = conn.execute(
+        """
+        SELECT type, SUM(amount) AS total_amount, SUM(value) AS total_value
+        FROM Invoice
+        WHERE housing_id = ?
+        GROUP BY type
+        """, 
+        (logement_id,)
+    ).fetchall()
+
+    economies_data = {
+        "categories": [row["type"] for row in factures],
+        "amounts": [row["total_amount"] for row in factures],
+        "values": [row["total_value"] for row in factures]
+    }
+
+    conn.close()
+
+    return templates.TemplateResponse("economies_realisees.html", {
+        "request": request,
+        "logements": logements,
+        "selected_id": logement_id,
+        "selected_logement_address": selected_logement["address"] if selected_logement else "Logement par Défaut",
+        "economies_data": economies_data
     })
 
 
