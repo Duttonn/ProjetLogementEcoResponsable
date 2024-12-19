@@ -360,6 +360,7 @@ def update_room(room_id: int, room: Room):
 
 @app.post("/sensors")
 def add_sensor(sensor: Sensor):
+    print(f"Reçu : {sensor}")  # DEBUG : Voir les données reçues
     conn = get_db_connection()
     try:
         conn.execute(
@@ -371,10 +372,12 @@ def add_sensor(sensor: Sensor):
         )
         conn.commit()
     except sqlite3.Error as e:
-        raise HTTPException(status_code=400, detail=f"Erreur lors de l'insertion: {e}")
+        raise HTTPException(status_code=400, detail=f"Erreur lors de l'insertion : {e}")
     finally:
         conn.close()
     return {"message": "Capteur ajouté avec succès."}
+
+
 
 @app.delete("/sensors/{sensor_id}")
 def delete_sensor(sensor_id: int):
@@ -489,19 +492,32 @@ def consommation_par_logement(request: Request, logement_id: int = None):
         "message": message
     })
 
-
-@app.get("/configuration", response_class=HTMLResponse)
-def configuration(request: Request):
+@app.get("/sensors/{housing_id}", response_class=HTMLResponse)
+def get_sensors_by_housing(request: Request, housing_id: int):
     conn = get_db_connection()
     logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
-    sensors = conn.execute("SELECT * FROM Sensor").fetchall()
+    sensors_by_room = conn.execute("""
+        SELECT r.name AS room_name, s.sensor_id, s.type_id, s.commercial_reference, s.communication_port, r.room_id
+        FROM Sensor s
+        JOIN Room r ON s.room_id = r.room_id
+        WHERE r.housing_id = ?
+        ORDER BY r.room_id
+    """, (housing_id,)).fetchall()
+    rooms = conn.execute("SELECT room_id, name FROM Room WHERE housing_id = ?", (housing_id,)).fetchall()
     conn.close()
+
+    selected_logement_address = next((logement['address'] for logement in logements if logement['housing_id'] == housing_id), None)
 
     return templates.TemplateResponse("configuration.html", {
         "request": request,
         "logements": logements,
-        "sensors": sensors
+        "sensors_by_room": sensors_by_room,
+        "rooms": rooms,
+        "selected_id": housing_id,
+        "selected_logement_address": selected_logement_address
     })
+
+
 
 
 @app.get("/economies_realisees", response_class=HTMLResponse)
