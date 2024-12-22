@@ -16,6 +16,10 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+app.mount("/node_modules", StaticFiles(directory="node_modules"), name="node_modules")
+
+
+
 database = "logement.db"
 
 from datetime import datetime
@@ -79,6 +83,37 @@ def get_logements(request: Request):
         "request": request,
         "logements": logements
     })
+
+@app.get("/simulator", response_class=HTMLResponse)
+def simulator(request: Request):
+    return templates.TemplateResponse("simulator.html", {"request": request})
+
+@app.get("/on-device", response_class=HTMLResponse)
+def on_device_view(request: Request):
+    conn = get_db_connection()
+    logements = conn.execute("SELECT * FROM Housing").fetchall()
+    conn.close()
+
+    # Convert sqlite3.Row to dictionaries
+    logements_list = [dict(row) for row in logements]
+
+    return templates.TemplateResponse("on-device.html", {
+        "request": request,
+        "logements": logements_list
+    })
+
+
+
+
+@app.get("/api/housings")
+def get_housings():
+    conn = get_db_connection()
+    logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
+    conn.close()
+
+    # Return logements as JSON
+    return [{"id": row["housing_id"], "address": row["address"]} for row in logements]
+
 
 @app.post("/logements", response_class=HTMLResponse)
 def add_logement(
@@ -491,6 +526,11 @@ def consommation_par_logement(request: Request, logement_id: int = None):
         "chart_data": chart_data,
         "message": message
     })
+
+
+@app.get("/virtualEnvironment", response_class=HTMLResponse)
+def virtual_environment(request: Request):
+    return templates.TemplateResponse("virtual_environment.html", {"request": request})
 
 @app.get("/sensors/{housing_id}", response_class=HTMLResponse)
 def get_sensors_by_housing(request: Request, housing_id: int):
