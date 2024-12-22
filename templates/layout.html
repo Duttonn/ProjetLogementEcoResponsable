@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Mon Application Écoresponsable{% endblock %}</title>
@@ -49,13 +50,13 @@
 <body>
     <header>
         {% include 'menu.html' %}
-        <h1>Mon Application Écoresponsable</h1>
+        <h1>Mon Application Éco-responsable</h1>
     </header>
     <main>
         {% block content %}{% endblock %}
     </main>
     <footer>
-        <p>&copy; 2024 Mon Application Écoresponsable</p>
+        <p>&copy; 2024 Mon Application Éco-responsable</p>
     </footer>
     {% block extra_js %}{% endblock %}
 </body>
