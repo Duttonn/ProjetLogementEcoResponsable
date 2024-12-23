@@ -4,6 +4,8 @@ import sqlite3
 from typing import List, Optional, Annotated
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse  # Added RedirectResponse import
+
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from datetime import datetime
@@ -17,6 +19,13 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 app.mount("/node_modules", StaticFiles(directory="node_modules"), name="node_modules")
+
+app.mount("/vr", StaticFiles(directory="dist"), name="frontend")
+
+# Rediriger /virtual_environment vers /vr/index.html
+@app.get("/test_vite", response_class=HTMLResponse)
+def virtual_environment(request: Request):
+    return RedirectResponse(url="/vr/index.html")
 
 
 
