@@ -1,15 +1,30 @@
 {
-  "name": "projetlogementecoresponsable",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "three_vite",
+  "version": "0.0.2",
+  "author": "ndutton",
+  "license": "MIT",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist",
+    
+    "create-venv": "python3 -m venv venv && echo 'Python virtual environment created'",
+    "generate-requirements": "venv/bin/pip freeze > requirements.txt || echo 'Failed to generate requirements.txt'",
+    "install-python": "venv/bin/pip install -r requirements.txt || echo 'requirements.txt not found'",
+    "start-python": "venv/bin/python -m uvicorn main:app --reload",
+    "activate-venv": "source venv/bin/activate",
+    
+    "postinstall": "npm run create-venv && npm run install-python && npm run generate-requirements"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "devDependencies": {
+    "@types/three": "^0.149.0",
+    "vite": "^4.1.1",
+    "vite-plugin-glsl": "^1.1.2",
+    "vite-plugin-static-copy": "^0.13.0"
+  },
   "dependencies": {
-    "three": "^0.171.0"
+    "three": "^0.157.0"
   }
 }
