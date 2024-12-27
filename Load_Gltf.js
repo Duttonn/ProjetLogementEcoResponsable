@@ -1,132 +1,192 @@
 "use strict";
 
-// Import only what you need, to help your bundler optimize final code size using tree shaking
-// see https://developer.mozilla.org/en-US/docs/Glossary/Tree_shaking)
-
 import {
     PerspectiveCamera,
     Scene,
     WebGLRenderer,
     BoxGeometry,
     Mesh,
-    MeshNormalMaterial,
-    AmbientLight,
-    Clock
+    MeshBasicMaterial,
+    MeshStandardMaterial,
+    HemisphereLight,
+    PlaneGeometry,
+    TextureLoader,
+    RepeatWrapping,
+    Clock,
+    Box3,
+    Vector3
 } from 'three';
-
-// If you prefer to import the whole library, with the THREE prefix, use the following line instead:
-// import * as THREE from 'three'
-
-// NOTE: three/addons alias is supported by Rollup: you can use it interchangeably with three/examples/jsm/  
-
-// Importing Ammo can be tricky.
-// Vite supports webassembly: https://vitejs.dev/guide/features.html#webassembly
-// so in theory this should work:
-//
-// import ammoinit from 'three/addons/libs/ammo.wasm.js?init';
-// ammoinit().then((AmmoLib) => {
-//  Ammo = AmmoLib.exports.Ammo()
-// })
-//
-// But the Ammo lib bundled with the THREE js examples does not seem to export modules properly.
-// A solution is to treat this library as a standalone file and copy it using 'vite-plugin-static-copy'.
-// See vite.config.js
-// 
-// Consider using alternatives like Oimo or cannon-es
-import {
-    OrbitControls
-} from 'three/addons/controls/OrbitControls.js';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import {
     GLTFLoader
 } from 'three/addons/loaders/GLTFLoader.js';
 
-// Example of hard link to official repo for data, if needed
-// const MODEL_PATH = 'https://raw.githubusercontent.com/mrdoob/js/r148/examples/models/gltf/LeePerrySmith/LeePerrySmith.glb';
-
-
-// INSERT CODE HERE
-
+// Scene and renderer setup
 const scene = new Scene();
 const aspect = window.innerWidth / window.innerHeight;
 const camera = new PerspectiveCamera(75, aspect, 0.1, 1000);
+camera.position.set(0, 5, 15);
 
-const light = new AmbientLight(0xffffff, 1.0); // soft white light
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+document.body.appendChild(VRButton.createButton(renderer));
+
+// Lighting
+const light = new HemisphereLight(0xffffff, 0x444444, 1);
 scene.add(light);
 
-const renderer = new WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
-
+// Orbit Controls
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.listenToKeyEvents(window); // optional
+controls.listenToKeyEvents(window);
 
-const geometry = new BoxGeometry(1, 1, 1);
-const material = new MeshNormalMaterial();
-const cube = new Mesh(geometry, material);
+// Floor (Grass Texture)
+const floorSize = 50;
+const grassTexture = new TextureLoader().load('/static/textures/grass.jpg');
+grassTexture.wrapS = grassTexture.wrapT = RepeatWrapping;
+grassTexture.repeat.set(50, 50);
 
-scene.add(cube);
+const floorGeometry = new PlaneGeometry(floorSize, floorSize);
+const floorMaterial = new MeshStandardMaterial({ map: grassTexture });
+const floor = new Mesh(floorGeometry, floorMaterial);
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
 
-function loadData() {
-    new GLTFLoader()
-        .setPath('assets/models/')
-        // .load('velo-1.3.glb', gltfReader);
-}
+// Fetch and Create Room
 
+async function fetchAndCreateRooms() {
+    try {
+        const response = await fetch(`/rooms/1`);  // Fetch rooms for housing ID 1
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const rooms = JSON.parse(doc.querySelector('#rooms-data').textContent);
 
-function gltfReader(gltf) {
-    let testModel = null;
+        const spacing = 0.2;  // Smaller spacing for finer adjustment
+        const roomPositions = [];  // Track placed room positions
 
-    testModel = gltf.scene;
+        const loader = new GLTFLoader();
 
-    if (testModel != null) {
-        console.log("Model loaded:  " + testModel);
-        scene.add(gltf.scene);
-    } else {
-        console.log("Load FAILED.  ");
+        for (const room of rooms) {
+            let modelSize = new Vector3(2, 2, 2);  // Default cube size
+
+            if (room.gltf_model) {
+                const gltfPath = `/static/models/${room.gltf_model.split('/').pop()}`;
+
+                loader.load(gltfPath, (gltf) => {
+                    const model = gltf.scene;
+
+                    // Compute bounding box
+                    const box = new Box3().setFromObject(model);
+                    if (box.isEmpty()) {
+                        model.traverse((child) => {
+                            if (child.isMesh) {
+                                child.geometry.computeBoundingBox();
+                                child.geometry.boundingBox.applyMatrix4(child.matrixWorld);
+                                box.union(child.geometry.boundingBox);
+                            }
+                        });
+                    }
+
+                    modelSize = box.getSize(new Vector3());
+
+                    // Calculate the initial position for the model
+                    const position = calculateRoomPosition(room, modelSize, roomPositions, spacing);
+                    model.position.set(position.x, -box.min.y, position.z);
+
+                    // Store the room's final position
+                    roomPositions.push({ position, size: modelSize });
+
+                    scene.add(model);
+                });
+
+            } else {
+                // Place a default cube at room coordinates if no GLTF model exists
+                const position = calculateRoomPosition(room, modelSize, roomPositions, spacing);
+                addCube(position.x, position.y, position.z, roomPositions, modelSize);
+            }
+        }
+    } catch (error) {
+        console.error("Failed to fetch rooms:", error);
     }
 }
 
-loadData();
+// Calculate the room position with incremental shifts along the room vector
+function calculateRoomPosition(room, modelSize, roomPositions, spacing) {
+    let position = new Vector3(room.x * (modelSize.x + spacing), 0, room.y * (modelSize.z + spacing));
+
+    // Generate shift vector based on room coordinates
+    const shiftVector = new Vector3(room.x, 0, room.y).normalize().multiplyScalar(spacing);
+
+    let collided = true;
+    let maxIterations = 200;  // Safety limit to avoid infinite loops
+
+    // Incrementally shift the cube along the room vector until no collision
+    while (collided && maxIterations-- > 0) {
+        collided = false;
+
+        for (const placedRoom of roomPositions) {
+            if (checkOverlap(position, modelSize, placedRoom.position, placedRoom.size, spacing)) {
+                position.add(shiftVector);  // Incrementally move in the vector direction
+                collided = true;
+                break;
+            }
+        }
+    }
+    return position;
+}
+
+// Helper function to detect cube overlaps
+function checkOverlap(pos1, size1, pos2, size2, spacing) {
+    return (
+        Math.abs(pos1.x - pos2.x) < (size1.x + size2.x) / 2 + spacing &&
+        Math.abs(pos1.z - pos2.z) < (size1.z + size2.z) / 2 + spacing
+    );
+}
+
+// Helper to create and position cubes if no model exists
+function addCube(x, y, z, roomPositions, modelSize) {
+    const geometry = new BoxGeometry(2, 2, 2);
+    const material = new MeshBasicMaterial({ color: Math.random() * 0xffffff });
+    const cube = new Mesh(geometry, material);
+    cube.position.set(x, y + 1, z);
+    scene.add(cube);
+    roomPositions.push({ position: new Vector3(x, y, z), size: modelSize });
+}
 
 
-camera.position.z = 3;
 
+// GLTF Loader (Optional for House Model)
+function loadData() {
+    // Load 3D house model
+    new GLTFLoader()
+        .setPath('assets/models/')
+        .load('house_model.glb', (gltf) => {
+            const model = gltf.scene;
+            model.position.set(0, 0, 0);
+            scene.add(model);
+        });
+}
 
+// Animation Loop
 const clock = new Clock();
-
-// Main loop
-const animation = () => {
-
-    renderer.setAnimationLoop(animation); // requestAnimationFrame() replacement, compatible with XR 
-
+renderer.setAnimationLoop(() => {
     const delta = clock.getDelta();
-    const elapsed = clock.getElapsedTime();
-
-    // can be used in shaders: uniforms.u_time.value = elapsed;
-
-    cube.rotation.x = elapsed / 2;
-    cube.rotation.y = elapsed / 1;
-
     renderer.render(scene, camera);
-};
+});
 
-animation();
-
-window.addEventListener('resize', onWindowResize, false);
-
-function onWindowResize() {
-
+// Handle Window Resize
+window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-
     renderer.setSize(window.innerWidth, window.innerHeight);
+});
 
-}
+// Load Data on Initialization
+// loadData();
+fetchAndCreateRooms();
 
-
-function Load_Gltf() {
-    loadData();
-}
-
-export { Load_Gltf };
+export { loadData };
