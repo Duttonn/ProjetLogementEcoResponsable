@@ -3,8 +3,9 @@ from pydantic import BaseModel
 import sqlite3
 from typing import List, Optional, Annotated
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
 from fastapi.responses import HTMLResponse, RedirectResponse  # Added RedirectResponse import
+from fastapi import UploadFile
+import os
 
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
@@ -86,12 +87,13 @@ def get_logements(request: Request):
     conn = get_db_connection()
     logements = conn.execute("SELECT * FROM Housing").fetchall()
     conn.close()
+    logements_list = [dict(row) for row in logements]
 
     # Rendu de la page HTML avec les logements existants
     return templates.TemplateResponse("logements.html", {
         "request": request,
-        "logements": logements
-    })
+        "logements": logements_list
+    })  
 
 @app.get("/simulator", response_class=HTMLResponse)
 def simulator(request: Request):
@@ -111,57 +113,79 @@ def on_device_view(request: Request):
         "logements": logements_list
     })
 
-
-
-
-@app.get("/api/housings")
-def get_housings():
-    conn = get_db_connection()
-    logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
-    conn.close()
-
-    # Return logements as JSON
-    return [{"id": row["housing_id"], "address": row["address"]} for row in logements]
-
-
-@app.post("/logements", response_class=HTMLResponse)
-def add_logement(
-    request: Request,
-    address: str = Form(...),
-    phone_number: str = Form(...),
-    ip_address: str = Form(...),
-    room_count: int = Form(...)
+@app.post("/rooms")
+async def add_room(
+    housing_id: int = Form(...),
+    name: str = Form(...),
+    x: float = Form(...),
+    y: float = Form(...),
+    z: float = Form(...),
+    gltf_model: Optional[UploadFile] = None
 ):
     conn = get_db_connection()
     try:
-        # Insérer le logement
-        cursor = conn.execute(
+        file_name = None
+        if gltf_model:
+            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+            file_path = os.path.join(UPLOAD_FOLDER, gltf_model.filename)
+            
+            # File upload (Proven to work)
+            with open(file_path, "wb") as buffer:
+                buffer.write(await gltf_model.read())
+            
+            file_name = file_path
+        
+        conn.execute(
             """
-            INSERT INTO Housing (address, phone_number, ip_address)
-            VALUES (?, ?, ?)
+            INSERT INTO Room (housing_id, name, x, y, z, gltf_model)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (address, phone_number, ip_address)
+            (housing_id, name, x, y, z, file_name)
         )
-        housing_id = cursor.lastrowid  # Récupérer l'ID du logement inséré
-
-        # Ajouter les pièces associées
-        for i in range(1, room_count + 1):
-            room_name = f"Pièce {i}"
-            conn.execute(
-                """
-                INSERT INTO Room (housing_id, name, x, y, z)
-                VALUES (?, ?, 0, 0, 0)
-                """,
-                (housing_id, room_name)
-            )
         conn.commit()
     except sqlite3.Error as e:
         raise HTTPException(status_code=400, detail=f"Erreur lors de l'insertion: {e}")
     finally:
         conn.close()
+    return {"message": "Pièce ajoutée avec succès."}
 
-    # Après l'insertion, on recharge la même page
-    return get_logements(request)
+
+@app.put("/rooms/{room_id}")
+async def update_room(
+    room_id: int,
+    gltf_model: Optional[UploadFile] = None
+):
+    conn = get_db_connection()
+    try:
+        file_name = None
+        if gltf_model:
+            os.makedirs("static/models", exist_ok=True)
+            file_path = f"static/models/{gltf_model.filename}"
+            
+            with open(file_path, "wb") as buffer:
+                buffer.write(await gltf_model.read())
+            
+            file_name = file_path
+            print(f"File uploaded: {file_path}")  # Log successful uploads
+
+            conn.execute(
+                """
+                UPDATE Room SET gltf_model = ?
+                WHERE room_id = ?
+                """,
+                (file_name, room_id)
+            )
+        conn.commit()
+    except sqlite3.Error as e:
+        print(f"Database Error: {e}")
+        raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
+    except Exception as e:
+        print(f"Unexpected Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur inattendue: {e}")
+    finally:
+        conn.close()
+    return {"message": "Modèle GLTF mis à jour avec succès."}
+
 
 @app.delete("/logements/{housing_id}")
 def delete_logement(housing_id: int):
@@ -178,24 +202,6 @@ def delete_logement(housing_id: int):
     finally:
         conn.close()
     return {"message": "Logement et ses données associées supprimés avec succès."}
-
-@app.put("/logements/{housing_id}")
-def update_logement(housing_id: int, logement: Logement):
-    conn = get_db_connection()
-    try:
-        conn.execute(
-            """
-            UPDATE Housing SET address = ?, phone_number = ?, ip_address = ?
-            WHERE housing_id = ?
-            """,
-            (logement.address, logement.phone_number, logement.ip_address, housing_id)
-        )
-        conn.commit()
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
-    finally:
-        conn.close()
-    return {"message": "Logement mis à jour avec succès."}
 
 # # Gestion des factures
 # @app.get("/invoices", response_model=List[Invoice])
@@ -337,25 +343,39 @@ def get_rooms_for_housing(request: Request, housing_id: int):
     logement_address = next((logement["address"] for logement in logements if logement["housing_id"] == housing_id), "Logement par Défaut")
     conn.close()
 
+    # Convert rows to dictionaries to avoid serialization errors
+    logements_list = [dict(logement) for logement in logements]
+    rooms_list = [dict(room) for room in rooms]
+
     return templates.TemplateResponse("rooms.html", {
         "request": request,
-        "logements": logements,
-        "rooms": rooms,
+        "logements": logements_list,
+        "rooms": rooms_list,
         "selected_id": housing_id,
         "selected_logement_address": logement_address
     })
 
 
+
 @app.post("/rooms")
-def add_room(room: Room):
+def add_room(
+    room: Room,
+    gltf_model: Optional[UploadFile] = None
+):
     conn = get_db_connection()
     try:
+        file_name = None
+        if gltf_model:
+            file_name = f"static/models/{gltf_model.filename}"
+            with open(file_name, "wb") as buffer:
+                buffer.write(gltf_model.file.read())
+        
         conn.execute(
             """
-            INSERT INTO Room (housing_id, name, x, y, z)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO Room (housing_id, name, x, y, z, gltf_model)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (room.housing_id, room.name, room.x, room.y, room.z)
+            (room.housing_id, room.name, room.x, room.y, room.z, file_name)
         )
         conn.commit()
     except sqlite3.Error as e:
@@ -363,6 +383,7 @@ def add_room(room: Room):
     finally:
         conn.close()
     return {"message": "Pièce ajoutée avec succès."}
+
 
 @app.delete("/rooms/{room_id}")
 def delete_room(room_id: int):

@@ -8,13 +8,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
-    
-    "create-venv": "python3 -m venv venv && echo 'Python virtual environment created'",
-    "generate-requirements": "venv/bin/pip freeze > requirements.txt || echo 'Failed to generate requirements.txt'",
-    "install-python": "venv/bin/pip install -r requirements.txt || echo 'requirements.txt not found'",
-    "start-python": "venv/bin/python -m uvicorn main:app --reload",
-    "activate-venv": "source venv/bin/activate",
+    "clean": "node -p \"process.platform === 'win32' ? 'rmdir /s /q dist' : 'rm -rf dist'\"",
+
+    "create-venv": "node -p \"process.platform === 'win32' ? 'python -m venv venv > nul 2>&1 && echo Python virtual environment created' : 'python3 -m venv venv > /dev/null 2>&1'\"",
+    "generate-requirements": "node -p \"process.platform === 'win32' ? 'venv\\\\Scripts\\\\pip freeze > requirements.txt > nul 2>&1' : 'venv/bin/pip freeze > requirements.txt > /dev/null 2>&1'\"",
+    "install-python": "node -p \"process.platform === 'win32' ? 'venv\\\\Scripts\\\\pip install -r requirements.txt > nul 2>&1' : 'venv/bin/pip install -r requirements.txt > /dev/null 2>&1'\"",
+    "start-python": "node -e \"require('child_process').execSync(process.platform === 'win32' ? 'venv\\\\Scripts\\\\python -m uvicorn main:app --reload' : 'venv/bin/python -m uvicorn main:app --reload', { stdio: 'inherit' })\"",
+    "activate-venv": "node -p \"process.platform === 'win32' ? 'venv\\\\Scripts\\\\activate' : 'source venv/bin/activate'\"",
     
     "postinstall": "npm run create-venv && npm run install-python && npm run generate-requirements"
   },

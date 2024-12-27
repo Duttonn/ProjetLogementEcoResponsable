@@ -29,14 +29,16 @@ FOREIGN KEY (housing_id) REFERENCES Housing(housing_id) -- Lien entre la facture
 
 -- Créer la table Room pour stocker les informations sur les pièces dans chaque logement
 CREATE TABLE Room (
-room_id INTEGER PRIMARY KEY, -- Identifiant unique pour chaque pièce
-housing_id INTEGER, -- Référence au logement qui contient cette pièce
-name VARCHAR(100), -- Nom de la pièce (ex. : chambre, cuisine)
-x FLOAT, -- Coordonnée X de la position de la pièce
-y FLOAT, -- Coordonnée Y de la position de la pièce
-z FLOAT, -- Coordonnée Z de la position de la pièce
-FOREIGN KEY (housing_id) REFERENCES Housing(housing_id) -- Lien entre la pièce et un logement spécifique
+    room_id INTEGER PRIMARY KEY, 
+    housing_id INTEGER,
+    name VARCHAR(100),
+    x FLOAT,
+    y FLOAT,
+    z FLOAT,
+    gltf_model VARCHAR(100) DEFAULT NULL,  -- Fix here: Comma instead of semicolon
+    FOREIGN KEY (housing_id) REFERENCES Housing(housing_id)
 );
+
 
 -- Créer la table SensorType pour stocker les différents types de capteurs/actionneurs
 CREATE TABLE SensorType (
@@ -76,6 +78,7 @@ INSERT INTO Room (room_id, housing_id, name, x, y, z) VALUES (1, 1, 'Salon', 0, 
 INSERT INTO Room (room_id, housing_id, name, x, y, z) VALUES (2, 1, 'Cuisine', 1, 0, 0);
 INSERT INTO Room (room_id, housing_id, name, x, y, z) VALUES (3, 1, 'Chambre', 0, 1, 0);
 INSERT INTO Room (room_id, housing_id, name, x, y, z) VALUES (4, 1, 'Salle de bain', 1, 1, 0);
+INSERT INTO Room (room_id, housing_id, name, x, y, z) VALUES (5, 1, 'salle de jeu', 1, 1, 1);
 
 -- Ajouter des types de capteurs/actionneurs
 INSERT INTO SensorType (type_id, name, unit_of_measurement, precision_range)

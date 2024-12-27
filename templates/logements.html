@@ -75,6 +75,10 @@
         {% endfor %}
     </div>
 
+    <script id="logements-data" type="application/json">
+        {{ logements | tojson | safe }}
+    </script>
+
     <!-- Formulaire d'ajout d'un logement -->
     <div class="form-container">
         <h2>Créer un Nouveau Logement</h2>

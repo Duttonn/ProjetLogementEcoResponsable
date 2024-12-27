@@ -4,6 +4,27 @@
 
 {% block extra_css %}
 <style>
+    .custom-file-upload {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        display: inline-block;
+        transition: background-color 0.2s, transform 0.2s;
+    }
+
+    .custom-file-upload:hover {
+        background-color: #45a049;
+        transform: scale(1.05);
+    }
+
+    #file-name {
+        font-size: 14px;
+        color: #555;
+    }
+
     .container {
         display: flex;
         height: 90vh;
@@ -116,14 +137,14 @@
     <div class="menu">
         {% for logement in logements %}
         <div class="menu-item {% if selected_id == logement.housing_id %}active{% endif %}"
-             onclick="location.href='/rooms/{{ logement.housing_id }}'">
+            onclick="location.href='/rooms/{{ logement.housing_id }}'">
             {{ logement.address }}
         </div>
         {% endfor %}
 
         <!-- Bouton Ajouter un Logement -->
         <div class="menu-item" style="background-color: #4caf50; color: white;"
-             onclick="location.href='http://localhost:8000/logements'">
+            onclick="location.href='http://localhost:8000/logements'">
             + Ajouter un Logement
         </div>
     </div>
@@ -142,48 +163,65 @@
         <div class="tile" id="tile-{{ room.room_id }}">
             <h3>{{ room.name }}</h3>
             <p><strong>Coordonnées :</strong> ({{ room.x }}, {{ room.y }}, {{ room.z }})</p>
+            <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+                <label for="gltf-upload-{{ room.room_id }}" class="custom-file-upload btn">
+                    Choisir un fichier
+                </label>
+                <input type="file" id="gltf-upload-{{ room.room_id }}" accept=".glb,.gltf" style="display: none;">
+                <span id="file-name-{{ room.room_id }}">
+                    {% if room.gltf_model %} {{ room.gltf_model.split('/')[-1] }} {% else %} Aucun fichier choisi {%
+                    endif %}
+                </span>
+            </div>
             <div style="margin-top: 10px;">
                 <button class="btn"
-                        onclick="openEditModal('{{ room.room_id }}', '{{ room.name }}', '{{ room.x }}', '{{ room.y }}', '{{ room.z }}')">Modifier</button>
+                    onclick="openEditModal('{{ room.room_id }}', '{{ room.name }}', '{{ room.x }}', '{{ room.y }}', '{{ room.z }}')">
+                    Modifier
+                </button>
                 <button class="btn" onclick="toggleSelection('{{ room.room_id }}')">Sélectionner</button>
             </div>
         </div>
         {% endfor %}
+
         {% else %}
         <p>Aucune pièce trouvée pour ce logement.</p>
         {% endif %}
     </div>
 </div>
 
+<script id="rooms-data" type="application/json">
+    {{ rooms | tojson | safe }}
+</script>
+
 <!-- Modal Ajout -->
 <div id="addModal" class="modal">
-      <div class="modal-content">
-          <h3>Ajouter une Pièce</h3>
-          <input type="text" id="addName" placeholder="Nom de la pièce" required>
-          <input type="number" id="addX" placeholder="Coordonnée X" step="0.01" required>
-          <input type="number" id="addY" placeholder="Coordonnée Y" step="0.01" required>
-          <input type="number" id="addZ" placeholder="Coordonnée Z" step="0.01" required>
-          <input type="hidden" id="addHousingId" value="{{ selected_id }}">
-          <button class="btn" onclick="addRoom()">Ajouter</button>
-          <button class="btn" onclick="closeAddModal()">Annuler</button>
-      </div>
-  </div>
-  
-  <!-- Modal Édition -->
-  <div id="editModal" class="modal">
-      <div class="modal-content">
-          <h3>Modifier la Pièce</h3>
-          <input type="hidden" id="editRoomId">
-          <input type="text" id="editName" placeholder="Nom de la pièce" required>
-          <input type="number" id="editX" placeholder="Coordonnée X" step="0.01" required>
-          <input type="number" id="editY" placeholder="Coordonnée Y" step="0.01" required>
-          <input type="number" id="editZ" placeholder="Coordonnée Z" step="0.01" required>
-          <input type="hidden" id="editHousingId" value="{{ selected_id }}">
-          <button class="btn" onclick="saveChanges()">Enregistrer</button>
-          <button class="btn" onclick="closeEditModal()">Annuler</button>
-      </div>
-  </div>
-  
+    <div class="modal-content">
+        <h3>Ajouter une Pièce</h3>
+        <input type="text" id="addName" placeholder="Nom de la pièce" required>
+        <input type="number" id="addX" placeholder="Coordonnée X" step="0.01" required>
+        <input type="number" id="addY" placeholder="Coordonnée Y" step="0.01" required>
+        <input type="number" id="addZ" placeholder="Coordonnée Z" step="0.01" required>
+        <input type="hidden" id="addHousingId" value="{{ selected_id }}">
+        <button class="btn" onclick="addRoom()">Ajouter</button>
+        <button class="btn" onclick="closeAddModal()">Annuler</button>
+    </div>
+</div>
+
+<!-- Modal Édition -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3>Modifier la Pièce</h3>
+        <input type="hidden" id="editRoomId">
+        <input type="text" id="editName" placeholder="Nom de la pièce" required>
+        <input type="number" id="editX" placeholder="Coordonnée X" step="0.01" required>
+        <input type="number" id="editY" placeholder="Coordonnée Y" step="0.01" required>
+        <input type="number" id="editZ" placeholder="Coordonnée Z" step="0.01" required>
+        <input type="hidden" id="editHousingId" value="{{ selected_id }}">
+        <button class="btn" onclick="saveChanges()">Enregistrer</button>
+        <button class="btn" onclick="closeEditModal()">Annuler</button>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -199,6 +237,45 @@
             selectedRooms.add(roomId);
         }
     }
+
+    document.querySelectorAll('input[type="file"]').forEach(input => {
+    input.addEventListener('change', async function () {
+        const fileNameDisplay = this.nextElementSibling;
+        const roomId = this.id.split('-').pop();
+        const file = this.files[0];
+
+        if (file) {
+            fileNameDisplay.textContent = file.name;
+
+            const formData = new FormData();
+            formData.append("gltf_model", file);
+            formData.append("room_id", roomId);
+
+            try {
+                const response = await fetch(`/rooms/${roomId}`, {
+                    method: "PUT",
+                    body: formData
+                });
+
+                if (response.ok) {
+                    alert("Modèle GLTF téléchargé avec succès !");
+                    window.location.reload();
+                } else {
+                    const errorData = await response.json();
+                    alert("Erreur lors du téléchargement du fichier: " + errorData.detail);
+                    console.error("Upload error:", errorData);
+                }
+            } catch (error) {
+                alert("Erreur de connexion avec le serveur.");
+                console.error("Network error:", error);
+            }
+        } else {
+            fileNameDisplay.textContent = 'Aucun fichier choisi';
+        }
+    });
+});
+
+
 
     function deleteSelected() {
         if (selectedRooms.size === 0) {
