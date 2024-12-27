@@ -6,15 +6,34 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse  # Added RedirectResponse import
 from fastapi import UploadFile
 import os
-
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from datetime import datetime
 from contextlib import asynccontextmanager
 import httpx
+import logging
 
 # Initialisation de l'application FastAPI
 app = FastAPI()
+
+# Define the upload folder
+UPLOAD_FOLDER = "static/models"
+
+
+
+# Middleware pour capturer l'erreur WinError 10054 et l'ignorer
+@app.middleware("http")
+async def catch_connection_reset_error(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except ConnectionResetError as e:
+        logging.warning(f"Connection reset by client: {e}")
+        return None
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
+        raise e
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -24,7 +43,7 @@ app.mount("/node_modules", StaticFiles(directory="node_modules"), name="node_mod
 app.mount("/vr", StaticFiles(directory="dist"), name="frontend")
 
 # Rediriger /virtual_environment vers /vr/index.html
-@app.get("/test_vite", response_class=HTMLResponse)
+@app.get("/vite_scene", response_class=HTMLResponse)
 def virtual_environment(request: Request):
     return RedirectResponse(url="/vr/index.html")
 
@@ -98,20 +117,6 @@ def get_logements(request: Request):
 @app.get("/simulator", response_class=HTMLResponse)
 def simulator(request: Request):
     return templates.TemplateResponse("simulator.html", {"request": request})
-
-@app.get("/on-device", response_class=HTMLResponse)
-def on_device_view(request: Request):
-    conn = get_db_connection()
-    logements = conn.execute("SELECT * FROM Housing").fetchall()
-    conn.close()
-
-    # Convert sqlite3.Row to dictionaries
-    logements_list = [dict(row) for row in logements]
-
-    return templates.TemplateResponse("on-device.html", {
-        "request": request,
-        "logements": logements_list
-    })
 
 @app.post("/rooms")
 async def add_room(
