@@ -51,6 +51,8 @@ const floorMaterial = new MeshStandardMaterial({ map: grassTexture });
 const floor = new Mesh(floorGeometry, floorMaterial);
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
+// Room Dictionary to track positions and sizes
+const roomDictionary = {};
 
 // Fetch and Create Room
 async function fetchAndCreateRooms() {
@@ -60,9 +62,6 @@ async function fetchAndCreateRooms() {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         const rooms = JSON.parse(doc.querySelector('#rooms-data').textContent);
-
-        const spacing = 0.02;  // Smaller spacing for finer adjustment
-        const roomPositions = [];  // Track placed room positions
 
         const loader = new GLTFLoader();
 
@@ -74,13 +73,10 @@ async function fetchAndCreateRooms() {
 
                 loader.load(gltfPath, (gltf) => {
                     const model = gltf.scene;
-
+                
                     // Compute bounding box
                     const box = new Box3().setFromObject(model);
-                    console.log("Bounding Box:", box.min, box.max);
-
                     if (box.isEmpty()) {
-                        // Force compute bounding box if empty
                         model.traverse((child) => {
                             if (child.isMesh) {
                                 child.geometry.computeBoundingBox();
@@ -89,35 +85,36 @@ async function fetchAndCreateRooms() {
                             }
                         });
                     }
-
+                
                     modelSize = box.getSize(new Vector3());
-                    const modelHeight = box.max.y - box.min.y;
-
-                    // Calculate the initial position for the model
-                    const position = calculateRoomPosition(room, modelSize, roomPositions, spacing);
-                    
-                    // Adjust Y position to stack correctly based on Z-coordinate
-                    model.position.set(position.x, room.z * modelSize.y + modelHeight / 2, position.z);
-                    
+                
+                    // Calculate model position
+                    const position = calculateRoomPosition(room, modelSize);
+                
+                    // Align model to the ground or upper floor by adjusting bounding box
+                    model.position.set(
+                        position.x,
+                        position.y - box.min.y,  // Ensure model sits on the floor
+                        position.z
+                    );
+                
                     console.log("Added GLTF at:", model.position);
-
-                    // Debugging: Enable wireframe for visibility (Optional)
-                    // model.traverse((child) => {
-                    //     if (child.isMesh) {
-                    //         child.material.wireframe = true;
-                    //     }
-                    // });
-
-                    // Store the room's final position
-                    roomPositions.push({ position, size: modelSize });
+                
+                    // Store room details in the dictionary
+                    const key = `${room.x},${room.y},${room.z}`;
+                    roomDictionary[key] = {
+                        position: position,
+                        size: modelSize,
+                        relative: new Vector3(room.x, room.y, room.z)
+                    };
 
                     scene.add(model);
                 });
 
             } else {
                 // Place a default cube at room coordinates if no GLTF model exists
-                const position = calculateRoomPosition(room, modelSize, roomPositions, spacing);
-                addCube(position.x, position.y, position.z, roomPositions, modelSize);
+                const position = calculateRoomPosition(room, modelSize);
+                addCube(position.x, position.y, position.z, modelSize);
             }
         }
     } catch (error) {
@@ -125,44 +122,50 @@ async function fetchAndCreateRooms() {
     }
 }
 
-// Calculate the room position with incremental shifts along the room vector
-function calculateRoomPosition(room, modelSize, roomPositions, spacing) {
-    let position = new Vector3(
-        room.x * (modelSize.x + spacing),
-        room.z * modelSize.y,  // Start at the correct floor level (Z-coordinate)
-        room.y * (modelSize.z + spacing)
-    );
+// Calculate Room Position using relative coordinate dictionary
+function calculateRoomPosition(room, modelSize) {
+    const relativeKey = `${room.x},${room.y},${room.z}`;
 
-    // Generate shift vector based on room coordinates (X, Y shift, not Z)
-    const shiftVector = new Vector3(room.x, 0, room.y).normalize().multiplyScalar(spacing);
+    // If this is the first room, place it at origin
+    if (room.x === 0 && room.y === 0 && room.z === 0) {
+        return new Vector3(0, 0, 0);
+    }
 
-    let collided = true;
-    let maxIterations = 200;  // Safety limit to avoid infinite loops
+    // Try to find adjacent rooms
+    let referenceRoom = null;
 
-    // Incrementally shift the model along the vector or stack it vertically
-    while (collided && maxIterations-- > 0) {
-        collided = false;
+    const directions = [
+        [1, 0, 0], [-1, 0, 0],  // X-direction neighbors
+        [0, 1, 0], [0, -1, 0],  // Y-direction (depth) neighbors
+        [0, 0, 1], [0, 0, -1]   // Z-direction (height) neighbors
+    ];
 
-        for (const placedRoom of roomPositions) {
-            if (checkOverlap(position, modelSize, placedRoom.position, placedRoom.size, spacing)) {
-                // Vertical stacking (increment Y) if overlap persists at the same (X, Z)
-                position.y += modelSize.y + spacing;
-                collided = true;
-                break;
-            }
+    for (const [dx, dy, dz] of directions) {
+        const adjacentKey = `${room.x - dx},${room.y - dy},${room.z - dz}`;
+        if (roomDictionary[adjacentKey]) {
+            referenceRoom = roomDictionary[adjacentKey];
+            break;
         }
     }
-    return position;
+
+    if (referenceRoom) {
+        const offsetX = (referenceRoom.size.x + modelSize.x) / 2;
+        const offsetZ = (referenceRoom.size.z + modelSize.z) / 2;
+        const offsetY = (referenceRoom.size.y + modelSize.y) / 2;
+
+        return new Vector3(
+            referenceRoom.position.x + offsetX * (room.x - referenceRoom.relative.x),
+            room.z * modelSize.y,  // Stack vertically by floor
+            referenceRoom.position.z + offsetZ * (room.y - referenceRoom.relative.y)
+        );
+    }
+
+    return new Vector3(0, 0, 0);  // Fallback to origin if no adjacent room
 }
 
-// Helper function to detect cube overlaps (includes vertical Y checks)
-function checkOverlap(pos1, size1, pos2, size2, spacing) {
-    return (
-        Math.abs(pos1.x - pos2.x) < (size1.x + size2.x) / 2 + spacing &&
-        Math.abs(pos1.z - pos2.z) < (size1.z + size2.z) / 2 + spacing &&
-        Math.abs(pos1.y - pos2.y) < (size1.y + size2.y) / 2
-    );
-}
+
+
+
 
 
 // Helper to create and position cubes if no model exists
