@@ -112,40 +112,63 @@ def get_logements(request: Request):
     return templates.TemplateResponse("logements.html", {
         "request": request,
         "logements": logements_list
-    })  
+    }) 
+
+
+@app.post("/logements", response_class=HTMLResponse)
+def add_logement(
+    request: Request,
+    address: str = Form(...),
+    phone_number: str = Form(...),
+    ip_address: str = Form(...),
+    room_count: int = Form(...)
+):
+    conn = get_db_connection()
+    try:
+        # Insérer le logement
+        cursor = conn.execute(
+            """
+            INSERT INTO Housing (address, phone_number, ip_address)
+            VALUES (?, ?, ?)
+            """,
+            (address, phone_number, ip_address)
+        )
+        housing_id = cursor.lastrowid  # Récupérer l'ID du logement inséré
+
+        # Ajouter les pièces associées
+        for i in range(1, room_count + 1):
+            room_name = f"Pièce {i}"
+            conn.execute(
+                """
+                INSERT INTO Room (housing_id, name, x, y, z)
+                VALUES (?, ?, 0, 0, 0)
+                """,
+                (housing_id, room_name)
+            )
+        conn.commit()
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=400, detail=f"Erreur lors de l'insertion: {e}")
+    finally:
+        conn.close()
+
+    # Après l'insertion, on recharge la même page
+    return get_logements(request)
+
 
 @app.get("/simulator", response_class=HTMLResponse)
 def simulator(request: Request):
     return templates.TemplateResponse("simulator.html", {"request": request})
 
 @app.post("/rooms")
-async def add_room(
-    housing_id: int = Form(...),
-    name: str = Form(...),
-    x: float = Form(...),
-    y: float = Form(...),
-    z: float = Form(...),
-    gltf_model: Optional[UploadFile] = None
-):
+def add_room(room: Room):
     conn = get_db_connection()
     try:
-        file_name = None
-        if gltf_model:
-            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-            file_path = os.path.join(UPLOAD_FOLDER, gltf_model.filename)
-            
-            # File upload (Proven to work)
-            with open(file_path, "wb") as buffer:
-                buffer.write(await gltf_model.read())
-            
-            file_name = file_path
-        
         conn.execute(
             """
-            INSERT INTO Room (housing_id, name, x, y, z, gltf_model)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO Room (housing_id, name, x, y, z)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (housing_id, name, x, y, z, file_name)
+            (room.housing_id, room.name, room.x, room.y, room.z)
         )
         conn.commit()
     except sqlite3.Error as e:
@@ -154,42 +177,61 @@ async def add_room(
         conn.close()
     return {"message": "Pièce ajoutée avec succès."}
 
-
 @app.put("/rooms/{room_id}")
 async def update_room(
     room_id: int,
-    gltf_model: Optional[UploadFile] = None
+    x: Optional[float] = Form(None),
+    y: Optional[float] = Form(None),
+    z: Optional[float] = Form(None),
+    name: Optional[str] = Form(None),
+    gltf_model: Optional[UploadFile] = None,
+    delete_gltf: Optional[bool] = Form(False),
 ):
     conn = get_db_connection()
     try:
-        file_name = None
+        # Delete existing GLTF model
+        if delete_gltf:
+            conn.execute(
+                "UPDATE Room SET gltf_model = NULL WHERE room_id = ?",
+                (room_id,),
+            )
+            conn.commit()
+            return {"message": "GLTF model removed successfully."}
+
+        # Upload new GLTF model
         if gltf_model:
             os.makedirs("static/models", exist_ok=True)
             file_path = f"static/models/{gltf_model.filename}"
-            
             with open(file_path, "wb") as buffer:
                 buffer.write(await gltf_model.read())
             
-            file_name = file_path
-            print(f"File uploaded: {file_path}")  # Log successful uploads
-
             conn.execute(
-                """
-                UPDATE Room SET gltf_model = ?
-                WHERE room_id = ?
-                """,
-                (file_name, room_id)
+                "UPDATE Room SET gltf_model = ? WHERE room_id = ?",
+                (file_path, room_id),
             )
+
+        # Update coordinates and name
+        conn.execute(
+            """
+            UPDATE Room
+            SET x = COALESCE(?, x),
+                y = COALESCE(?, y),
+                z = COALESCE(?, z),
+                name = COALESCE(?, name)
+            WHERE room_id = ?
+            """,
+            (x, y, z, name, room_id),
+        )
+
         conn.commit()
     except sqlite3.Error as e:
-        print(f"Database Error: {e}")
         raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
-    except Exception as e:
-        print(f"Unexpected Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur inattendue: {e}")
     finally:
         conn.close()
-    return {"message": "Modèle GLTF mis à jour avec succès."}
+
+    return {"message": "Pièce mise à jour avec succès."}
+
+
 
 
 @app.delete("/logements/{housing_id}")
@@ -402,23 +444,23 @@ def delete_room(room_id: int):
         conn.close()
     return {"message": "Pièce supprimée avec succès."}
 
-@app.put("/rooms/{room_id}")
-def update_room(room_id: int, room: Room):
-    conn = get_db_connection()
-    try:
-        conn.execute(
-            """
-            UPDATE Room SET housing_id = ?, name = ?, x = ?, y = ?, z = ?
-            WHERE room_id = ?
-            """,
-            (room.housing_id, room.name, room.x, room.y, room.z, room_id)
-        )
-        conn.commit()
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
-    finally:
-        conn.close()
-    return {"message": "Pièce mise à jour avec succès."}
+# @app.put("/rooms/{room_id}")
+# def update_room(room_id: int, room: Room):
+#     conn = get_db_connection()
+#     try:
+#         conn.execute(
+#             """
+#             UPDATE Room SET housing_id = ?, name = ?, x = ?, y = ?, z = ?
+#             WHERE room_id = ?
+#             """,
+#             (room.housing_id, room.name, room.x, room.y, room.z, room_id)
+#         )
+#         conn.commit()
+#     except sqlite3.Error as e:
+#         raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
+#     finally:
+#         conn.close()
+#     return {"message": "Pièce mise à jour avec succès."}
 
 # # Gestion des capteurs
 # @app.get("/sensors", response_model=List[Sensor])

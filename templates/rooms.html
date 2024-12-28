@@ -20,6 +20,43 @@
         transform: scale(1.05);
     }
 
+    .file-icon {
+        width: 51px;
+        /* 1.7x the original 30px size */
+        height: 51px;
+        object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+
+    .file-icon:hover {
+        transform: scale(1.2);
+    }
+
+    /* Container to swap the static and GIF image */
+    .file-icon-container {
+        display: inline-block;
+        width: 51px;
+        height: 51px;
+    }
+
+    .file-icon-container img {
+        display: block;
+    }
+
+    .file-icon-container .hover-gif {
+        display: none;
+    }
+
+    .file-icon-container:hover .static-img {
+        display: none;
+    }
+
+    .file-icon-container:hover .hover-gif {
+        display: block;
+    }
+
+
+
     #file-name {
         font-size: 14px;
         color: #555;
@@ -164,10 +201,28 @@
             <h3>{{ room.name }}</h3>
             <p><strong>Coordonnées :</strong> ({{ room.x }}, {{ room.y }}, {{ room.z }})</p>
             <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
-                <label for="gltf-upload-{{ room.room_id }}" class="custom-file-upload btn">
-                    Choisir un fichier
+                <!-- Label for file selection -->
+                <label id="file-label-{{ room.room_id }}" for="gltf-upload-{{ room.room_id }}"
+                    class="custom-file-upload btn" {% if room.gltf_model %}style="background-color: transparent;" {%
+                    endif %}>
+                    <div class="file-icon-container">
+                        <img src="/static/icons/3d-file-static.png" alt="3D Static" class="file-icon static-img">
+                        <img src="/static/icons/3d-file.gif" alt="3D File" class="file-icon hover-gif">
+                    </div>
                 </label>
+
+
+
+                <!-- Hidden file input -->
                 <input type="file" id="gltf-upload-{{ room.room_id }}" accept=".glb,.gltf" style="display: none;">
+
+                <!-- Separate Delete Button -->
+                <button id="delete-btn-{{ room.room_id }}" class="btn" {% if not room.gltf_model
+                    %}style="display: none;" {% endif %} onclick="deleteFile('{{ room.room_id }}')">
+                    ❌ Supprimer
+                </button>
+
+                <!-- File Name Display -->
                 <span id="file-name-{{ room.room_id }}">
                     {% if room.gltf_model %} {{ room.gltf_model.split('/')[-1] }} {% else %} Aucun fichier choisi {%
                     endif %}
@@ -198,9 +253,9 @@
     <div class="modal-content">
         <h3>Ajouter une Pièce</h3>
         <input type="text" id="addName" placeholder="Nom de la pièce" required>
-        <input type="number" id="addX" placeholder="Coordonnée X" step="0.01" required>
-        <input type="number" id="addY" placeholder="Coordonnée Y" step="0.01" required>
-        <input type="number" id="addZ" placeholder="Coordonnée Z" step="0.01" required>
+        <input type="number" id="addX" placeholder="Coordonnée X" step="1" required>
+        <input type="number" id="addY" placeholder="Coordonnée Y" step="1" required>
+        <input type="number" id="addZ" placeholder="Coordonnée Z" step="1" required>
         <input type="hidden" id="addHousingId" value="{{ selected_id }}">
         <button class="btn" onclick="addRoom()">Ajouter</button>
         <button class="btn" onclick="closeAddModal()">Annuler</button>
@@ -239,17 +294,51 @@
     }
 
     document.querySelectorAll('input[type="file"]').forEach(input => {
-    input.addEventListener('change', async function () {
-        const fileNameDisplay = this.nextElementSibling;
-        const roomId = this.id.split('-').pop();
-        const file = this.files[0];
+        input.addEventListener('change', async function () {
+            const roomId = this.id.split('-').pop();
+            const fileLabel = document.getElementById(`file-label-${roomId}`);
+            const deleteButton = document.getElementById(`delete-btn-${roomId}`);
+            const fileNameDisplay = this.nextElementSibling.nextElementSibling;
+            const file = this.files[0];
 
-        if (file) {
-            fileNameDisplay.textContent = file.name;
+            if (file) {
+                fileNameDisplay.textContent = file.name;
 
+                // Replace text with gif
+                fileLabel.innerHTML = `<img src="/static/icons/3d-file.gif" alt="3D File" width="30px" height="30px">`;
+                fileLabel.style.backgroundColor = "transparent";
+                deleteButton.style.display = "inline-block";
+
+                const formData = new FormData();
+                formData.append("gltf_model", file);
+                formData.append("room_id", roomId);
+
+                try {
+                    const response = await fetch(`/rooms/${roomId}`, {
+                        method: "PUT",
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        alert("Modèle GLTF téléchargé avec succès !");
+                        window.location.reload();
+                    } else {
+                        const errorData = await response.json();
+                        alert("Erreur lors du téléchargement du fichier: " + errorData.detail);
+                    }
+                } catch (error) {
+                    alert("Erreur de connexion avec le serveur.");
+                    console.error("Network error:", error);
+                }
+            }
+        });
+    });
+
+    // Delete File Logic
+    async function deleteFile(roomId) {
+        if (confirm("Voulez-vous vraiment supprimer ce fichier GLTF ?")) {
             const formData = new FormData();
-            formData.append("gltf_model", file);
-            formData.append("room_id", roomId);
+            formData.append("delete_gltf", "true");
 
             try {
                 const response = await fetch(`/rooms/${roomId}`, {
@@ -258,22 +347,27 @@
                 });
 
                 if (response.ok) {
-                    alert("Modèle GLTF téléchargé avec succès !");
-                    window.location.reload();
+                    alert("Fichier supprimé !");
+                    const fileNameDisplay = document.getElementById(`file-name-${roomId}`);
+                    const fileLabel = document.getElementById(`file-label-${roomId}`);
+                    const fileInput = document.getElementById(`gltf-upload-${roomId}`);
+                    const deleteButton = document.getElementById(`delete-btn-${roomId}`);
+
+                    fileNameDisplay.textContent = 'Aucun fichier choisi';
+                    fileLabel.innerHTML = '<img src="/static/icons/3d-file.gif" alt="3D File" width="30px" height="30px">';
+                    fileLabel.style.backgroundColor = "#4caf50";
+                    fileInput.disabled = false;
+                    deleteButton.style.display = "none";
                 } else {
                     const errorData = await response.json();
-                    alert("Erreur lors du téléchargement du fichier: " + errorData.detail);
-                    console.error("Upload error:", errorData);
+                    alert("Erreur lors de la suppression du fichier: " + errorData.detail);
                 }
             } catch (error) {
                 alert("Erreur de connexion avec le serveur.");
                 console.error("Network error:", error);
             }
-        } else {
-            fileNameDisplay.textContent = 'Aucun fichier choisi';
         }
-    });
-});
+    }
 
 
 
@@ -305,6 +399,9 @@
 
     async function addRoom() {
         const name = document.getElementById("addName").value;
+        const x = document.getElementById("addX").value;
+        const y = document.getElementById("addY").value;
+        const z = document.getElementById("addZ").value;
 
         const response = await fetch("/rooms", {
             method: "POST",
@@ -312,7 +409,7 @@
             body: JSON.stringify({
                 housing_id: "{{ selected_id }}",
                 name: name,
-                x: 0, y: 0, z: 0
+                x: x, y: y, z: z
             })
         });
 
@@ -336,20 +433,39 @@
     }
 
     async function saveChanges() {
-        const id = document.getElementById("editRoomId").value;
+        const roomId = document.getElementById("editRoomId").value;
         const name = document.getElementById("editName").value;
+        const x = document.getElementById("editX").value;
+        const y = document.getElementById("editY").value;
+        const z = document.getElementById("editZ").value;
+        const fileInput = document.getElementById(`gltf-upload-${roomId}`);
+        const file = fileInput ? fileInput.files[0] : null;
 
-        const response = await fetch(`/rooms/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ housing_id: "{{ selected_id }}", name, x: 0, y: 0, z: 0 })
-        });
+        const formData = new FormData();
+        formData.append("x", x);
+        formData.append("y", y);
+        formData.append("z", z);
+        formData.append("name", name);
+        if (file) {
+            formData.append("gltf_model", file);
+        }
 
-        if (response.ok) {
-            alert("Pièce mise à jour avec succès !");
-            window.location.reload();
-        } else {
-            alert("Erreur lors de la mise à jour de la pièce.");
+        try {
+            const response = await fetch(`/rooms/${roomId}`, {
+                method: "PUT",
+                body: formData,
+            });
+
+            if (response.ok) {
+                alert("Pièce mise à jour avec succès !");
+                window.location.reload();
+            } else {
+                const errorData = await response.json();
+                alert("Erreur lors de la mise à jour: " + errorData.detail);
+            }
+        } catch (error) {
+            alert("Erreur de connexion avec le serveur.");
+            console.error("Network error:", error);
         }
     }
 </script>
