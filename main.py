@@ -206,77 +206,7 @@ def delete_logement(housing_id: int):
 def simulator(request: Request):
     return templates.TemplateResponse("simulator.html", {"request": request})
 
-@app.post("/rooms")
-def add_room(room: Room):
-    conn = get_db_connection()
-    try:
-        conn.execute(
-            """
-            INSERT INTO Room (housing_id, name, x, y, z)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (room.housing_id, room.name, room.x, room.y, room.z)
-        )
-        conn.commit()
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=400, detail=f"Erreur lors de l'insertion: {e}")
-    finally:
-        conn.close()
-    return {"message": "Pièce ajoutée avec succès."}
 
-@app.put("/rooms/{room_id}")
-async def update_room(
-    room_id: int,
-    x: Optional[float] = Form(None),
-    y: Optional[float] = Form(None),
-    z: Optional[float] = Form(None),
-    name: Optional[str] = Form(None),
-    gltf_model: Optional[UploadFile] = None,
-    delete_gltf: Optional[bool] = Form(False),
-):
-    conn = get_db_connection()
-    try:
-        # Delete existing GLTF model
-        if delete_gltf:
-            conn.execute(
-                "UPDATE Room SET gltf_model = NULL WHERE room_id = ?",
-                (room_id,),
-            )
-            conn.commit()
-            return {"message": "GLTF model removed successfully."}
-
-        # Upload new GLTF model
-        if gltf_model:
-            os.makedirs("static/models", exist_ok=True)
-            file_path = f"static/models/{gltf_model.filename}"
-            with open(file_path, "wb") as buffer:
-                buffer.write(await gltf_model.read())
-            
-            conn.execute(
-                "UPDATE Room SET gltf_model = ? WHERE room_id = ?",
-                (file_path, room_id),
-            )
-
-        # Update coordinates and name
-        conn.execute(
-            """
-            UPDATE Room
-            SET x = COALESCE(?, x),
-                y = COALESCE(?, y),
-                z = COALESCE(?, z),
-                name = COALESCE(?, name)
-            WHERE room_id = ?
-            """,
-            (x, y, z, name, room_id),
-        )
-
-        conn.commit()
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
-    finally:
-        conn.close()
-
-    return {"message": "Pièce mise à jour avec succès."}
 
 
 
@@ -383,31 +313,80 @@ def get_rooms_for_housing(request: Request, housing_id: int):
 
 
 @app.post("/rooms")
-def add_room(
-    room: Room,
-    gltf_model: Optional[UploadFile] = None
-):
+def add_room(room: Room):
     conn = get_db_connection()
     try:
-        file_name = None
-        if gltf_model:
-            file_name = f"static/models/{gltf_model.filename}"
-            with open(file_name, "wb") as buffer:
-                buffer.write(gltf_model.file.read())
-        
         conn.execute(
             """
-            INSERT INTO Room (housing_id, name, x, y, z, gltf_model)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO Room (housing_id, name, x, y, z)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (room.housing_id, room.name, room.x, room.y, room.z, file_name)
+            (room.housing_id, room.name, room.x, room.y, room.z)
         )
         conn.commit()
     except sqlite3.Error as e:
+        conn.rollback()
         raise HTTPException(status_code=400, detail=f"Erreur lors de l'insertion: {e}")
     finally:
         conn.close()
     return {"message": "Pièce ajoutée avec succès."}
+
+
+
+
+@app.put("/rooms/{room_id}")
+async def update_room(
+    room_id: int,
+    x: Optional[float] = Form(None),
+    y: Optional[float] = Form(None),
+    z: Optional[float] = Form(None),
+    name: Optional[str] = Form(None),
+    gltf_model: Optional[UploadFile] = None,
+    delete_gltf: Optional[bool] = Form(False),
+):
+    conn = get_db_connection()
+    try:
+        # Delete existing GLTF model
+        if delete_gltf:
+            conn.execute(
+                "UPDATE Room SET gltf_model = NULL WHERE room_id = ?",
+                (room_id,),
+            )
+            conn.commit()
+            return {"message": "GLTF model removed successfully."}
+
+        # Upload new GLTF model
+        if gltf_model:
+            os.makedirs("static/models", exist_ok=True)
+            file_path = f"static/models/{gltf_model.filename}"
+            with open(file_path, "wb") as buffer:
+                buffer.write(await gltf_model.read())
+            
+            conn.execute(
+                "UPDATE Room SET gltf_model = ? WHERE room_id = ?",
+                (file_path, room_id),
+            )
+
+        # Update coordinates and name
+        conn.execute(
+            """
+            UPDATE Room
+            SET x = COALESCE(?, x),
+                y = COALESCE(?, y),
+                z = COALESCE(?, z),
+                name = COALESCE(?, name)
+            WHERE room_id = ?
+            """,
+            (x, y, z, name, room_id),
+        )
+
+        conn.commit()
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
+    finally:
+        conn.close()
+
+    return {"message": "Pièce mise à jour avec succès."}
 
 
 @app.delete("/rooms/{room_id}")
@@ -422,31 +401,6 @@ def delete_room(room_id: int):
         conn.close()
     return {"message": "Pièce supprimée avec succès."}
 
-# @app.put("/rooms/{room_id}")
-# def update_room(room_id: int, room: Room):
-#     conn = get_db_connection()
-#     try:
-#         conn.execute(
-#             """
-#             UPDATE Room SET housing_id = ?, name = ?, x = ?, y = ?, z = ?
-#             WHERE room_id = ?
-#             """,
-#             (room.housing_id, room.name, room.x, room.y, room.z, room_id)
-#         )
-#         conn.commit()
-#     except sqlite3.Error as e:
-#         raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
-#     finally:
-#         conn.close()
-#     return {"message": "Pièce mise à jour avec succès."}
-
-# # Gestion des capteurs
-# @app.get("/sensors", response_model=List[Sensor])
-# def get_sensors():
-#     conn = get_db_connection()
-#     sensors = conn.execute("SELECT * FROM Sensor").fetchall()
-#     conn.close()
-#     return [dict(sensor) for sensor in sensors]
 
 @app.post("/sensors")
 def add_sensor(sensor: Sensor):
@@ -613,15 +567,13 @@ def get_sensors_by_housing(request: Request, housing_id: int):
     })
 
 
-
-
 @app.get("/economies_realisees", response_class=HTMLResponse)
 def economies_realisees(request: Request, logement_id: int = None):
     conn = get_db_connection()
     logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
 
     if logement_id is None:
-        logement_id = 1  # Sélection par défaut du logement 1
+        logement_id = 1  # Sélection par défaut
 
     selected_logement = conn.execute(
         "SELECT address FROM Housing WHERE housing_id = ?", (logement_id,)
@@ -633,7 +585,7 @@ def economies_realisees(request: Request, logement_id: int = None):
         FROM Invoice
         WHERE housing_id = ?
         GROUP BY type
-        """, 
+        """,
         (logement_id,)
     ).fetchall()
 
@@ -683,7 +635,7 @@ async def meteo(request: Request):
         "dates": data["daily"]["time"],
         "max_temp": data["daily"]["temperature_2m_max"],
         "min_temp": data["daily"]["temperature_2m_min"],
-        "icons": [weather_code_map.get(code, "inconnu.gif") for code in data["daily"]["weathercode"]],
+        "icons": [weather_code_map.get(code, "nuage.gif") for code in data["daily"]["weathercode"]],
         "hourly": {
             "times": data["hourly"]["time"],
             "temperatures": data["hourly"]["temperature_2m"],
@@ -693,6 +645,39 @@ async def meteo(request: Request):
     return templates.TemplateResponse("meteo.html", {"request": request, "forecast": forecast})
 
 
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    # Fetch météo data for the homepage
+    base_url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": 48.8566,  # Paris
+        "longitude": 2.3522,
+        "daily": "temperature_2m_max,temperature_2m_min,weathercode",
+        "hourly": "temperature_2m",
+        "timezone": "Europe/Paris",
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(base_url, params=params)
+        data = response.json()
+
+    if "daily" in data and "hourly" in data:
+        forecast = {
+            "dates": data["daily"]["time"],
+            "max_temp": data["daily"]["temperature_2m_max"],
+            "min_temp": data["daily"]["temperature_2m_min"],
+            "hourly": {
+                "times": data["hourly"]["time"],
+                "temperatures": data["hourly"]["temperature_2m"],
+            }
+        }
+    else:
+        forecast = {}
+
+    return templates.TemplateResponse("accueil.html", {
+        "request": request,
+        "forecast": forecast  # Ensure forecast is passed
+    })
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

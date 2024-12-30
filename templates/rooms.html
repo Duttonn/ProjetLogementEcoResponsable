@@ -4,91 +4,60 @@
 
 {% block extra_css %}
 <style>
-    .custom-file-upload {
-        background-color: #4caf50;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        display: inline-block;
-        transition: background-color 0.2s, transform 0.2s;
-    }
-
-    .custom-file-upload:hover {
-        background-color: #45a049;
-        transform: scale(1.05);
-    }
-
-    .file-icon {
-        width: 51px;
-        /* 1.7x the original 30px size */
-        height: 51px;
-        object-fit: cover;
-        transition: transform 0.3s ease;
-    }
-
-    .file-icon:hover {
-        transform: scale(1.2);
-    }
-
-    /* Container to swap the static and GIF image */
-    .file-icon-container {
-        display: inline-block;
-        width: 51px;
-        height: 51px;
-    }
-
-    .file-icon-container img {
-        display: block;
-    }
-
-    .file-icon-container .hover-gif {
-        display: none;
-    }
-
-    .file-icon-container:hover .static-img {
-        display: none;
-    }
-
-    .file-icon-container:hover .hover-gif {
-        display: block;
-    }
-
-
-
-    #file-name {
-        font-size: 14px;
-        color: #555;
-    }
-
-    .container {
+    .container-fluid {
         display: flex;
-        height: 90vh;
+        flex-direction: column;
+    }
+
+    
+
+    @media (min-width: 768px) {
+        .container-fluid {
+            flex-direction: row;
+        }
     }
 
     .menu {
-        width: 200px;
+        width: 100%;
         background-color: #e8f5e9;
         padding: 15px;
-        border-right: 2px solid #c8e6c9;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    @media (min-width: 768px) {
+        .menu {
+            width: 250px;
+            border-bottom: none;
+            border-radius: 12px;
+        }
     }
 
     .menu-item {
         background-color: #c8e6c9;
-        padding: 10px;
-        margin: 10px 0;
-        text-align: center;
-        border-radius: 5px;
+        padding: 20px;
+        margin: 15px 0;
+        text-align: left;
+        border-radius: 8px;
         cursor: pointer;
-        transition: transform 0.3s, background 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        transition: transform 0.3s, box-shadow 0.3s;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .menu-item i {
+        font-size: 20px;
+        color: #4caf50;
     }
 
     .menu-item:hover,
     .menu-item.active {
         background-color: #4caf50;
         color: white;
-        transform: scale(1.05);
+        transform: translateY(-5px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
     }
 
     .content {
@@ -165,25 +134,148 @@
         border: 1px solid #ddd;
         border-radius: 5px;
     }
+
+    .tile {
+        background-color: #f1f8e9;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s, box-shadow 0.3s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .tile:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .tile h3 {
+        margin-bottom: 10px;
+        font-size: 1.5rem;
+    }
+
+    .tile p {
+        margin: 5px 0;
+        color: #555;
+    }
+
+    .file-icon-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+
+    .file-icon {
+        width: 50px;
+        height: 50px;
+        transition: opacity 0.3s;
+    }
+
+    .static-img {
+        opacity: 1;
+    }
+
+    .hover-gif {
+        opacity: 0;
+        position: absolute;
+    }
+
+    .file-icon-container:hover .static-img {
+        opacity: 0;
+    }
+
+    .file-icon-container:hover .hover-gif {
+        opacity: 1;
+    }
+
+    .custom-file-upload {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        border: none;
+        font-size: 1rem;
+        transition: background-color 0.3s, transform 0.2s;
+    }
+
+    .custom-file-upload:hover {
+        background-color: #388e3c;
+        transform: scale(1.05);
+    }
+
+    .btn {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s, transform 0.2s;
+    }
+
+    .btn:hover {
+        background-color: #43a047;
+        transform: scale(1.05);
+    }
+
+    #file-name {
+        font-size: 0.9rem;
+        color: #666;
+        margin-left: 10px;
+    }
+
+    @media (max-width: 768px) {
+        .tile {
+            width: 90%;
+            margin: 10px auto;
+        }
+
+        .tile h3 {
+            font-size: 1.3rem;
+        }
+
+        .btn, .custom-file-upload {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .file-icon {
+            width: 40px;
+            height: 40px;
+        }
+
+        #file-name {
+            display: block;
+            margin: 10px 0;
+        }
+    }
+
+
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <!-- Menu Vertical -->
     <div class="menu">
         {% for logement in logements %}
         <div class="menu-item {% if selected_id == logement.housing_id %}active{% endif %}"
             onclick="location.href='/rooms/{{ logement.housing_id }}'">
+            <i class="fas fa-door-open"></i>
             {{ logement.address }}
         </div>
         {% endfor %}
 
-        <!-- Bouton Ajouter un Logement -->
         <div class="menu-item" style="background-color: #4caf50; color: white;"
-            onclick="location.href='http://localhost:8000/logements'">
-            + Ajouter un Logement
-        </div>
+                  onclick="location.href='http://localhost:8000/logements'">
+                  + Ajouter un Logement
+            </div>
     </div>
 
     <!-- Contenu Principal -->
@@ -398,29 +490,35 @@
     }
 
     async function addRoom() {
-        const name = document.getElementById("addName").value;
-        const x = document.getElementById("addX").value;
-        const y = document.getElementById("addY").value;
-        const z = document.getElementById("addZ").value;
+    const name = document.getElementById("addName").value;
+    const x = parseFloat(document.getElementById("addX").value);
+    const y = parseFloat(document.getElementById("addY").value);
+    const z = parseFloat(document.getElementById("addZ").value);
+    const housing_id = parseInt(document.getElementById("addHousingId").value);  // Assure que c'est bien un entier
 
-        const response = await fetch("/rooms", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                housing_id: "{{ selected_id }}",
-                name: name,
-                x: x, y: y, z: z
-            })
-        });
+    const payload = {
+        housing_id: housing_id,
+        name: name,
+        x: x,
+        y: y,
+        z: z
+    };
 
-        if (response.ok) {
-            alert("Pièce ajoutée avec succès !");
-            window.location.reload();
-        } else {
-            alert("Erreur lors de l'ajout de la pièce.");
-        }
-        closeAddModal();
+    const response = await fetch("/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+        alert("Pièce ajoutée avec succès !");
+        window.location.reload();
+    } else {
+        const errorData = await response.json();
+        alert("Erreur lors de l'ajout de la pièce : " + errorData.detail);
     }
+    closeAddModal();
+}
 
     function openEditModal(id, name, x, y, z) {
         document.getElementById("editRoomId").value = id;
