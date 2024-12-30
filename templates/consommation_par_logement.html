@@ -20,30 +20,51 @@
         width: 100%;
         background-color: #e8f5e9;
         padding: 15px;
+        border-radius: 12px;
+        /* Coins arrondis */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        /* Ombre subtile */
     }
 
     @media (min-width: 768px) {
         .menu {
-            width: 200px;
+            width: 250px;
             border-bottom: none;
+            border-radius: 12px;
+            /* Coins arrondis */
         }
     }
 
     .menu-item {
         background-color: #c8e6c9;
-        padding: 10px;
-        margin: 10px 0;
-        text-align: center;
-        border-radius: 5px;
+        padding: 20px;
+        /* Plus d'espace autour du texte */
+        margin: 15px 0;
+        text-align: left;
+        /* Texte aligné à gauche */
+        border-radius: 8px;
         cursor: pointer;
-        transition: transform 0.3s, background 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        /* Espace entre icône et texte */
+        transition: transform 0.3s, box-shadow 0.3s;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .menu-item i {
+        font-size: 20px;
+        color: #4caf50;
     }
 
     .menu-item:hover,
     .menu-item.active {
         background-color: #4caf50;
         color: white;
-        transform: scale(1.05);
+        transform: translateY(-5px);
+        /* Légère montée au hover */
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        /* Ombre plus prononcée */
     }
 
     .content {

@@ -7,10 +7,17 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav">
                 <li class="nav-item"><a class="nav-link text-white" href="/logements">Logements</a></li>
-                <li class="nav-item"><a class="nav-link text-white" href="/visualiser_factures">Visualiser Factures</a></li>
-                <li class="nav-item"><a class="nav-link text-white" href="/consommation_par_logement">Consommation</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/visualiser_factures">Visualiser Factures</a>
+                </li>
+                <li class="nav-item"><a class="nav-link text-white" href="/consommation_par_logement">Consommation</a>
+                </li>
                 <li class="nav-item"><a class="nav-link text-white" href="/economies_realisees">Économies</a></li>
                 <li class="nav-item"><a class="nav-link text-white" href="/sensors/1">Capteurs</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/meteo">Prévisions Météo</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/rooms/1">Pièces</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/virtualEnvironment">Environnement Virtuel</a>
+                </li>
+
             </ul>
         </div>
     </div>
@@ -18,11 +25,51 @@
 
 <style>
     .navbar {
-        background-color: #4caf50 !important;  /* Align with header color */
-    }
-    .navbar-brand, .nav-link {
-        color: white !important;
-    }
+    background-color: #4caf50 !important;  /* Couleur de fond */
+}
+
+.navbar-brand, .nav-link {
+    color: white !important;
+    position: relative;  /* Nécessaire pour l'effet underline */
+    text-transform: uppercase;
+    font-weight: 500;
+    transition: color 0.3s ease;  /* Transition de couleur */
+}
+
+/* Effet au survol */
+.nav-link:hover {
+    color: #ffd700 !important;  /* Changement de couleur (doré) */
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);  /* Légère lueur */
+}
+
+/* Effet de soulignement animé */
+.nav-link::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -3px;
+    width: 0;
+    height: 2px;
+    background-color: #ffd700;  /* Barre de soulignement dorée */
+    transition: width 0.3s ease;
+}
+
+/* Agrandir la barre au hover */
+.nav-link:hover::after {
+    width: 100%;
+}
+
+/* Ajustement pour le bouton hamburger */
+.navbar-toggler {
+    border: 1px solid white;
+    transition: all 0.3s ease;
+}
+
+.navbar-toggler:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
 </style>
 
 
@@ -31,7 +78,7 @@
     function toggleMenu() {
         const sidebar = document.getElementById('sidebar-menu');
         const menuButton = document.getElementById('menu-button');
-        
+
         if (sidebar.style.left === '0px') {
             sidebar.style.left = '-250px'; // Close the sidebar
         } else {
