@@ -6,14 +6,27 @@
 <style>
     .container {
         display: flex;
-        height: 90vh;
+        flex-direction: column;
+        height: 100vh;
+    }
+
+    @media (min-width: 768px) {
+        .container {
+            flex-direction: row;
+        }
     }
 
     .menu {
-        width: 200px;
+        width: 100%;
         background-color: #e8f5e9;
         padding: 15px;
-        border-right: 2px solid #c8e6c9;
+    }
+
+    @media (min-width: 768px) {
+        .menu {
+            width: 200px;
+            border-bottom: none;
+        }
     }
 
     .menu-item {
@@ -42,6 +55,7 @@
         display: flex;
         justify-content: center;
         margin-bottom: 20px;
+        flex-wrap: wrap;
     }
 
     .chart-toggle button {
@@ -50,7 +64,7 @@
         border: none;
         padding: 10px 20px;
         border-radius: 5px;
-        margin: 0 10px;
+        margin: 10px 5px;
         cursor: pointer;
         transition: transform 0.2s;
     }
@@ -61,8 +75,9 @@
     }
 
     #chart_div {
-        width: 800px;
-        height: 500px;
+        width: 100%;
+        max-width: 800px;
+        height: auto;
         margin: auto;
     }
 
@@ -83,7 +98,6 @@
             {{ logement.address }}
         </div>
         {% endfor %}
-
 
         <!-- Nouveau bouton Ajouter un Logement -->
         <div class="menu-item" style="background-color: #4caf50; color: white;"
@@ -108,7 +122,7 @@
         {% endif %}
 
         <p style="text-align: center; margin-top: 20px;">
-            <a href="/visualiser_factures" class="btn">Voir les factures</a>
+            <a href="/visualiser_factures" class="btn btn-success">Voir les factures</a>
         </p>
     </div>
 </div>
