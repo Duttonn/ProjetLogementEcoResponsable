@@ -5,8 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Mon Application Écoresponsable{% endblock %}</title>
-    
-    <!-- Favicon -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
+        <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', path='icons/favicon.ico') }}" type="image/x-icon">
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
