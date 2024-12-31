@@ -70,10 +70,28 @@
 
         @media (max-width: 480px) {
             .button-group {
-                grid-template-columns: 1fr;
-                /* 1 button per row on small screens */
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                /* Ensure proper vertical alignment */
+                padding: 0;
+                /* Remove extra padding */
+            }
+
+            .button-group .cta-button:not(:first-child) {
+                display: none;
+            }
+
+            .button-group .cta-button:first-child {
+                width: auto;
+                /* Reset width to adapt naturally */
+                padding: 15px 30px;
+                /* Ensure proper padding */
+                box-sizing: border-box;
+                /* Ensure consistent box model */
             }
         }
+
 
 
 
@@ -146,7 +164,7 @@
 
         // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
-        const pointLight = new THREE.PointLight(0xffffff, 2);
+        const pointLight = new THREE.PointLight(0xffffff, 0.7);
         pointLight.position.set(200, 300, 400);
         scene.add(ambientLight, pointLight);
 

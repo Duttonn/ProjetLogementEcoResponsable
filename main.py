@@ -542,6 +542,62 @@ def get_sensors_by_housing(request: Request, housing_id: int):
         "selected_logement_address": selected_logement_address
     })
 
+@app.get("/measurements/{sensor_id}", response_class=HTMLResponse)
+def get_sensor_measurements(request: Request, sensor_id: int):
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row  # Ensure rows are returned as dictionaries
+    
+    logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
+    measurements = conn.execute(
+        "SELECT value, insert_date FROM Measurements WHERE sensor_id = ? ORDER BY insert_date DESC",
+        (sensor_id,)
+    ).fetchall()
+
+    sensor_info = conn.execute(
+        """
+        SELECT h.housing_id, h.address
+        FROM Sensor s
+        JOIN Room r ON s.room_id = r.room_id
+        JOIN Housing h ON r.housing_id = h.housing_id
+        WHERE s.sensor_id = ?
+        """,
+        (sensor_id,)
+    ).fetchone()
+    
+    conn.close()
+
+    # Convert sqlite3.Row to dict
+    measurements = [dict(m) for m in measurements]
+
+    return templates.TemplateResponse("measurements.html", {
+        "request": request,
+        "sensor_id": sensor_id,
+        "measurements": measurements,
+        "housing_id": sensor_info["housing_id"] if sensor_info else 1,
+        "selected_logement_address": sensor_info["address"] if sensor_info else "Logement par Défaut"
+    })
+
+@app.post("/mesure/")
+def add_measurement(measurement: Measurement):
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            """
+            INSERT INTO Measurements (sensor_id, value, insert_date)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            """,
+            (measurement.sensor_id, measurement.value)
+        )
+        conn.commit()
+    except sqlite3.Error as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"Erreur lors de l'insertion: {e}")
+    finally:
+        conn.close()
+    return {"message": "Mesure ajoutée avec succès"}
+
+
+
 
 @app.get("/economies_realisees", response_class=HTMLResponse)
 def economies_realisees(request: Request, logement_id: int = None):
@@ -661,7 +717,8 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,
-        ssl_keyfile="localhost-key.pem",
-        ssl_certfile="localhost.pem"
+        reload=True
+        # ,
+        # ssl_keyfile="localhost-key.pem",
+        # ssl_certfile="localhost.pem"
     )

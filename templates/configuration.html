@@ -16,55 +16,55 @@
       }
 
       .menu {
-        width: 100%;
-        background-color: #e8f5e9;
-        padding: 15px;
-        border-radius: 12px;
-        /* Coins arrondis */
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        /* Ombre subtile */
-    }
-
-    @media (min-width: 768px) {
-        .menu {
-            width: 250px;
-            border-bottom: none;
+            width: 100%;
+            background-color: #e8f5e9;
+            padding: 15px;
             border-radius: 12px;
             /* Coins arrondis */
-        }
-    }
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            /* Ombre subtile */
+      }
 
-    .menu-item {
-        background-color: #c8e6c9;
-        padding: 20px;
-        /* Plus d'espace autour du texte */
-        margin: 15px 0;
-        text-align: left;
-        /* Texte aligné à gauche */
-        border-radius: 8px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        /* Espace entre icône et texte */
-        transition: transform 0.3s, box-shadow 0.3s;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
+      @media (min-width: 768px) {
+            .menu {
+                  width: 250px;
+                  border-bottom: none;
+                  border-radius: 12px;
+                  /* Coins arrondis */
+            }
+      }
 
-    .menu-item i {
-        font-size: 20px;
-        color: #4caf50;
-    }
+      .menu-item {
+            background-color: #c8e6c9;
+            padding: 20px;
+            /* Plus d'espace autour du texte */
+            margin: 15px 0;
+            text-align: left;
+            /* Texte aligné à gauche */
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            /* Espace entre icône et texte */
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
 
-    .menu-item:hover,
-    .menu-item.active {
-        background-color: #4caf50;
-        color: white;
-        transform: translateY(-5px);
-        /* Légère montée au hover */
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-        /* Ombre plus prononcée */
-    }
+      .menu-item i {
+            font-size: 20px;
+            color: #4caf50;
+      }
+
+      .menu-item:hover,
+      .menu-item.active {
+            background-color: #4caf50;
+            color: white;
+            transform: translateY(-5px);
+            /* Légère montée au hover */
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+            /* Ombre plus prononcée */
+      }
 
       .content {
             flex: 1;
@@ -179,9 +179,18 @@
                               <h4>Type : {{ sensor.type }}</h4>
                               <p><strong>Référence :</strong> {{ sensor.commercial_reference }}</p>
                               <p><strong>Port :</strong> {{ sensor.communication_port }}</p>
+
                               <button class="btn"
-                                    onclick="openEditModal('{{ sensor.sensor_id }}', '{{ sensor.room_id }}', '{{ sensor.type_id }}', '{{ sensor.commercial_reference }}', '{{ sensor.communication_port }}')">Modifier</button>
-                              <button class="btn" onclick="toggleSelection('{{ sensor.sensor_id }}')">Sélectionner</button>
+                                    onclick="openEditModal('{{ sensor.sensor_id }}', '{{ sensor.room_id }}', '{{ sensor.type_id }}', '{{ sensor.commercial_reference }}', '{{ sensor.communication_port }}')">
+                                    Modifier
+                              </button>
+
+                              <button class="btn"
+                                    onclick="toggleSelection('{{ sensor.sensor_id }}')">Sélectionner</button>
+
+                              <a href="/measurements/{{ sensor.sensor_id }}" class="btn" style="text-decoration: none;">
+                                    Voir Mesures
+                              </a>
                         </div>
                         {% endfor %}
                   </div>
@@ -199,7 +208,8 @@
                               <p><strong>Port :</strong> {{ sensor.communication_port }}</p>
                               <button class="btn"
                                     onclick="openEditModal('{{ sensor.sensor_id }}', null, '{{ sensor.type_id }}', '{{ sensor.commercial_reference }}', '{{ sensor.communication_port }}')">Modifier</button>
-                              <button class="btn" onclick="toggleSelection('{{ sensor.sensor_id }}')">Sélectionner</button>
+                              <button class="btn"
+                                    onclick="toggleSelection('{{ sensor.sensor_id }}')">Sélectionner</button>
                         </div>
                         {% endfor %}
                   </div>
@@ -358,4 +368,26 @@
             editModal.style.display = "none";
       }
 </script>
+
+<script>
+      function fetchMeasurements(sensorId) {
+            fetch(`/measurements/${sensorId}`)
+                  .then(response => response.json())
+                  .then(data => {
+                        const container = document.getElementById(`measurements-container-${sensorId}`);
+                        const list = document.getElementById(`measurements-list-${sensorId}`);
+                        list.innerHTML = '';
+                        data.forEach(item => {
+                              const li = document.createElement('li');
+                              li.textContent = `Valeur: ${item[0]} | Date: ${item[1]}`;
+                              list.appendChild(li);
+                        });
+                        container.style.display = 'block';
+                  })
+                  .catch(err => {
+                        console.error('Erreur de chargement des mesures:', err);
+                  });
+      }
+</script>
+
 {% endblock %}
