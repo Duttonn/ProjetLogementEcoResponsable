@@ -74,7 +74,7 @@ npm run build
 npm run serv
 ```
 
-L'API FastAPI sera accessible à l'adresse **[http://0.0.0.0:8000](http://0.0.0.0:8000)**.
+L'API FastAPI sera accessible à l'adresse **[https://0.0.0.0:8000](https://0.0.0.0:8000)**.
 
 ---
 

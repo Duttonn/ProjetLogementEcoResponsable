@@ -25,19 +25,6 @@ UPLOAD_FOLDER = "static/models"
 
 
 
-# # Middleware pour capturer l'erreur WinError 10054 et l'ignorer
-# @app.middleware("http")
-# async def catch_connection_reset_error(request: Request, call_next):
-#     try:
-#         return await call_next(request)
-#     except ConnectionResetError as e:
-#         logging.warning(f"Connection reset by client: {e}")
-#         return None
-#     except Exception as e:
-#         logging.error(f"Unexpected error: {e}")
-#         raise e
-
-
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -198,13 +185,6 @@ def delete_logement(housing_id: int):
     finally:
         conn.close()
     return {"message": "Logement supprimé avec succès"}
-
-
-
-
-@app.get("/simulator", response_class=HTMLResponse)
-def simulator(request: Request):
-    return templates.TemplateResponse("simulator.html", {"request": request})
 
 
 
@@ -536,10 +516,6 @@ def consommation_par_logement(request: Request, logement_id: int = None):
         "message": message
     })
 
-
-@app.get("/virtualEnvironment", response_class=HTMLResponse)
-def virtual_environment(request: Request):
-    return templates.TemplateResponse("virtual_environment.html", {"request": request})
 
 @app.get("/sensors/{housing_id}", response_class=HTMLResponse)
 def get_sensors_by_housing(request: Request, housing_id: int):
