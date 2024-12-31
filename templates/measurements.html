@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+
+{% block title %}Mesures du Capteur{% endblock %}
+
+{% block extra_css %}
+<style>
+    .container {
+        max-width: 800px;
+        margin: 30px auto;
+        padding: 20px;
+        background-color: #f1f8e9;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .measurement-item {
+        background: white;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .measurement-item span {
+        font-size: 16px;
+    }
+
+    .btn-back {
+        display: block;
+        margin: 20px auto;
+        padding: 10px 25px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        text-align: center;
+        text-decoration: none;
+        transition: background 0.3s;
+    }
+
+    .btn-back:hover {
+        background-color: #45a049;
+        transform: scale(1.05);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="text-center">Mesures du Capteur</h2>
+    <p class="text-center"><strong>Capteur ID :</strong> {{ sensor_id }}</p>
+
+    <div id="measurements-list">
+        {% if measurements %}
+            {% for measurement in measurements %}
+            <div class="measurement-item">
+                <span>Valeur : <strong>{{ measurement['value'] }}</strong></span>
+                <span>Date : {{ measurement['insert_date'] }}</span>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-center">Aucune mesure trouvée pour ce capteur.</p>
+        {% endif %}
+    </div>
+
+    <a href="/sensors/{{ housing_id }}" class="btn-back">Retour à la Configuration</a>
+</div>
+{% endblock %}
