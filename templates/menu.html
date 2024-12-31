@@ -1,39 +1,80 @@
-<nav>
-    <!-- Menu Button -->
-    <div id="menu-button" style="cursor: pointer; padding: 10px; position: absolute; top: 0; left: 0; color: white;" onclick="toggleMenu()">
-        ☰ Menu
-    </div>
-
-    <!-- Sidebar Menu -->
-    <div id="sidebar-menu" style="
-        position: fixed;
-        top: 0;
-        left: -250px; /* Hidden by default */
-        width: 250px;
-        height: 100%;
-        background-color: #4caf50; /* Green Background */
-        color: black; /* Text Color */
-        padding-top: 60px;
-        transition: left 0.3s;
-        z-index: 1000;
-    ">
-        <a href="/logements" class="menu-item">Logements</a>
-        <a href="/visualiser_factures" class="menu-item">Visualiser Factures</a>
-        <a href="/consommation_par_logement" class="menu-item">Consommation par Logement</a>
-        <a href="/economies_realisees" class="menu-item">Économies Réalisées</a>
-        <a href="/sensors/1" class="menu-item">Configuration capteurs</a>
-        <a href="/rooms/1" class="menu-item">Pièces</a>
-        <a href="/virtualEnvironment" class="menu-item">Virtual Environment</a>
-        <a href="/meteo" class="menu-item">Météo</a>        
+<nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+        <a class="navbar-brand text-white" href="/">Acceuil</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item"><a class="nav-link text-white" href="/logements">Logements</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/rooms/1">Pièces</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/sensors/1">Capteurs</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/visualiser_factures">Factures</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/consommation_par_logement">Consommation</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/economies_realisees">Économies</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/meteo">Météo</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="/virtualEnvironment">Environnement Virtuel</a></li>
+            </ul>
+        </div>
     </div>
 </nav>
+
+<style>
+    .navbar {
+    background-color: #4caf50 !important;  /* Couleur de fond */
+}
+
+.navbar-brand, .nav-link {
+    color: white !important;
+    position: relative;  /* Nécessaire pour l'effet underline */
+    text-transform: uppercase;
+    font-weight: 500;
+    transition: color 0.3s ease;  /* Transition de couleur */
+}
+
+/* Effet au survol */
+.nav-link:hover {
+    color: #ffd700 !important;  /* Changement de couleur (doré) */
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);  /* Légère lueur */
+}
+
+/* Effet de soulignement animé */
+.nav-link::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -3px;
+    width: 0;
+    height: 2px;
+    background-color: #ffd700;  /* Barre de soulignement dorée */
+    transition: width 0.3s ease;
+}
+
+/* Agrandir la barre au hover */
+.nav-link:hover::after {
+    width: 100%;
+}
+
+/* Ajustement pour le bouton hamburger */
+.navbar-toggler {
+    border: 1px solid white;
+    transition: all 0.3s ease;
+}
+
+.navbar-toggler:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+</style>
+
 
 <!-- JavaScript to Handle Sidebar Toggle -->
 <script>
     function toggleMenu() {
         const sidebar = document.getElementById('sidebar-menu');
         const menuButton = document.getElementById('menu-button');
-        
+
         if (sidebar.style.left === '0px') {
             sidebar.style.left = '-250px'; // Close the sidebar
         } else {
@@ -41,32 +82,3 @@
         }
     }
 </script>
-
-<style>
-    /* Menu Button Styling */
-    #menu-button {
-        font-size: 18px;
-        background-color: transparent;
-        border: none;
-        z-index: 1001; /* Ensure it's above the menu */
-    }
-
-    /* Sidebar Menu Item Styling */
-    .menu-item {
-        display: block;
-        padding: 10px 20px;
-        text-decoration: none;
-        color: black; /* Visible on white buttons */
-        font-size: 16px;
-        background-color: white; /* White Buttons */
-        margin: 5px 10px; /* Margin for Spacing */
-        border-radius: 5px; /* Rounded Corners */
-        transition: background 0.2s, color 0.2s;
-    }
-
-    /* Hover Effect */
-    .menu-item:hover {
-        background-color: #388e3c; /* Darker Green */
-        color: white; /* White Text on Hover */
-    }
-</style>

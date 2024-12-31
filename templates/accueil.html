@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accueil - Logement Écoresponsable</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body,
+        html {
+            margin: 0;
+            height: 100%;
+            font-family: 'Montserrat', sans-serif;
+            background: linear-gradient(180deg, #e8f5e9, #c8e6c9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: start;
+        }
+
+        #container3D {
+            height: 60vh;
+            width: 100vw;
+            position: relative;
+            pointer-events: auto;
+            z-index: 1;
+        }
+
+        header {
+            margin-top: 20px;
+            font-size: 2.8rem;
+            color: #2e7d32;
+            font-weight: 900;
+            text-align: center;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            /* Espace entre les boutons */
+            margin-top: 40px;
+            /* Ajustement vers le bas */
+            z-index: 10;
+            position: relative;
+            justify-content: center;
+            max-width: 1000px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .cta-button {
+            background-color: #4caf50;
+            color: white;
+            padding: 15px 0;
+            border-radius: 10px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            width: 230px;
+            /* Largeur fixe pour tous les boutons */
+            height: 70px;
+            /* Hauteur fixe */
+            text-align: center;
+            line-height: 40px;
+            /* Centrer le texte verticalement */
+        }
+
+        .cta-button:hover {
+            transform: translateY(-7px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .forecast-section {
+            margin-top: 40px;
+            text-align: center;
+            width: 80%;
+        }
+
+        .forecast-card {
+            display: inline-block;
+            margin: 15px;
+            padding: 20px;
+            border-radius: 12px;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 180px;
+        }
+
+        .forecast-date {
+            font-weight: 700;
+            color: #388e3c;
+        }
+
+        .forecast-temp {
+            font-size: 1.5rem;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        Bienvenue dans votre Logement Écoresponsable
+        <div style="font-size: 1.2rem; color: #4caf50; margin-top: 10px;">
+            Visualisez votre logement en 3D et suivez vos prévisions météo
+        </div>
+    </header>
+
+    <!-- 3D Container -->
+    <div id="container3D"></div>
+
+    <div class="button-group">
+        <button class="cta-button" onclick="navigateTo('/logements')">Logements</button>
+        <button class="cta-button" onclick="navigateTo('/rooms/1')">Pièces</button>
+        <button class="cta-button" onclick="navigateTo('/sensors/1')">Capteurs</button>
+        <button class="cta-button" onclick="navigateTo('/visualiser_factures')">Factures</button>
+        <button class="cta-button" onclick="navigateTo('/consommation_par_logement')">Consommation</button>
+        <button class="cta-button" onclick="navigateTo('/economies_realisees')">Économies</button>
+        <button class="cta-button" onclick="navigateTo('/meteo')">Météo</button>
+        <button class="cta-button" onclick="navigateTo('/virtualEnvironment')">VR</button>
+    </div>
+
+
+
+
+    <script>
+        function navigateTo(url) {
+            window.location.href = url;
+        }
+    </script>
+
+    <!-- Three.js and GLTFLoader Import -->
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.129.0/build/three.module.js';
+        import { OrbitControls } from 'https://cdn.skypack.dev/three@0.129.0/examples/jsm/controls/OrbitControls.js';
+        import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.129.0/examples/jsm/loaders/GLTFLoader.js';
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 3000);
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+
+        renderer.setSize(window.innerWidth, window.innerHeight * 0.7);
+        renderer.domElement.style.position = 'absolute';
+        renderer.domElement.style.top = '0';
+        renderer.domElement.style.zIndex = '0';
+
+        document.getElementById("container3D").appendChild(renderer.domElement);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+        const pointLight = new THREE.PointLight(0xffffff, 2);
+        pointLight.position.set(200, 300, 400);
+        scene.add(ambientLight, pointLight);
+
+        const loader = new GLTFLoader();
+        let object;
+
+        loader.load(
+            '/static/models/eye/scene.glb',
+            function (gltf) {
+                object = gltf.scene;
+                scene.add(object);
+                object.scale.set(0.5, 0.5, 0.5);
+                object.position.set(0, -800, -800);
+                camera.position.set(0, 300, 1200);  // Zoom out
+            }
+        );
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableZoom = false;
+        controls.enablePan = false;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (object) {
+                object.rotation.y += 0.002;
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+
+</body>
+
+</html>
