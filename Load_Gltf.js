@@ -22,13 +22,17 @@ import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
 let camera, scene, raycaster, renderer;
-let controller1, controller2;
+let controllerLeft, controllerRight;
 let controllerGrip1, controllerGrip2;
 
 let room, marker, floor, baseReferenceSpace;
 
 let INTERSECTION;
+let normal;
 const tempMatrix = new THREE.Matrix4();
+
+const loader = new GLTFLoader();
+
 
 init();
 
@@ -87,6 +91,12 @@ function init() {
 
     }
 
+    function onSelectStartSensor() {
+
+        this.userData.isPlacingSensor = true;
+
+    }
+
     function onSelectEnd() {
 
         this.userData.isSelecting = false;
@@ -104,35 +114,69 @@ function init() {
 
     }
 
-    controller1 = renderer.xr.getController(0);
-    controller1.addEventListener('selectstart', onSelectStart);
-    controller1.addEventListener('selectend', onSelectEnd);
-    controller1.addEventListener('connected', function (event) {
+    function onSelectEndSensor() {
+        this.userData.isPlacingSensor = false;
+    
+        if (INTERSECTION) {
+            const intersectPoint = INTERSECTION.clone();  // Clone to prevent changes
+            const intersectNormal = normal.clone();
+
+            const intersectedRoomId = INTERSECTION.object.userData.roomId || 'unknown';
+            const intersectedHousingId = INTERSECTION.object.userData.housingId || 'unknown';
+    
+            const gltfPath = `/static/models/sensor.glb`;
+    
+            loader.load(gltfPath, (gltf) => {
+                const model = gltf.scene;
+    
+                // Scale down the model by 10
+                model.scale.set(0.01, 0.01, 0.01);
+
+    
+                // Set the model position to the saved intersection point
+                model.position.copy(intersectPoint);
+    
+                // Apply orientation based on the normal
+                const quaternion = new THREE.Quaternion();
+                quaternion.setFromUnitVectors(new Vector3(0, 1, 0), intersectNormal);
+                model.quaternion.copy(quaternion);
+    
+                scene.add(model);
+                console.log("Added sensor at:", model.position);
+            });
+        }
+    }
+    
+
+    controllerLeft = renderer.xr.getController(0);
+    controllerLeft.addEventListener('selectstart', onSelectStartSensor);
+    controllerLeft.addEventListener('selectend', onSelectEndSensor);
+    controllerLeft.addEventListener('connected', function (event) {
 
         this.add(buildController(event.data));
 
     });
-    controller1.addEventListener('disconnected', function () {
+    controllerLeft.addEventListener('disconnected', function () {
 
         this.remove(this.children[0]);
 
     });
-    scene.add(controller1);
+    scene.add(controllerLeft);
 
-    controller2 = renderer.xr.getController(1);
-    controller2.addEventListener('selectstart', onSelectStart);
-    controller2.addEventListener('selectend', onSelectEnd);
-    controller2.addEventListener('connected', function (event) {
+    controllerRight = renderer.xr.getController(1);
+    controllerRight.addEventListener('selectstart', onSelectStart);
+    controllerRight.addEventListener('selectend', onSelectEnd);
+    controllerRight.addEventListener('connected', function (event) {
 
         this.add(buildController(event.data));
 
     });
-    controller2.addEventListener('disconnected', function () {
+    controllerRight.addEventListener('disconnected', function () {
 
         this.remove(this.children[0]);
 
     });
-    scene.add(controller2);
+    scene.add(controllerRight);
 
     // The XRControllerModelFactory will automatically fetch controller models
     // that match what the user is holding as closely as possible. The models
@@ -191,51 +235,57 @@ function onWindowResize() {
 }
 
 //
-
 function animate() {
-
     INTERSECTION = undefined;
+    const obj = modelList;
+    obj.push(floor);
 
-    if (controller1.userData.isSelecting === true) {
+    if (controllerLeft.userData.isPlacingSensor === true) {
+        tempMatrix.identity().extractRotation(controllerLeft.matrixWorld);
 
-        tempMatrix.identity().extractRotation(controller1.matrixWorld);
-
-        raycaster.ray.origin.setFromMatrixPosition(controller1.matrixWorld);
+        raycaster.ray.origin.setFromMatrixPosition(controllerLeft.matrixWorld);
         raycaster.ray.direction.set(0, 0, - 1).applyMatrix4(tempMatrix);
 
-        const intersects = raycaster.intersectObjects([floor]);
-
-        if (intersects.length > 0) {
-
-            INTERSECTION = intersects[0].point;
-
-        }
-
-    } else if (controller2.userData.isSelecting === true) {
-
-        tempMatrix.identity().extractRotation(controller2.matrixWorld);
-
-        raycaster.ray.origin.setFromMatrixPosition(controller2.matrixWorld);
-        raycaster.ray.direction.set(0, 0, - 1).applyMatrix4(tempMatrix);
-        const obj = modelList
-        obj.push(floor)
         const intersects = raycaster.intersectObjects(obj);
 
         if (intersects.length > 0) {
-
             INTERSECTION = intersects[0].point;
+            normal = intersects[0].face.normal; // Get the normal of the intersection
 
+            // Create a quaternion rotation based on the normal
+            const quaternion = new THREE.Quaternion();
+            quaternion.setFromUnitVectors(new Vector3(0, 1, 0), normal);
+
+            // Apply rotation to the marker
+            marker.position.copy(INTERSECTION);
+            marker.quaternion.copy(quaternion);
         }
+    } else if (controllerRight.userData.isSelecting === true) {
+        tempMatrix.identity().extractRotation(controllerRight.matrixWorld);
 
+        raycaster.ray.origin.setFromMatrixPosition(controllerRight.matrixWorld);
+        raycaster.ray.direction.set(0, 0, - 1).applyMatrix4(tempMatrix);
+
+        const intersects = raycaster.intersectObjects(obj);
+
+        if (intersects.length > 0) {
+            INTERSECTION = intersects[0].point;
+            normal = intersects[0].face.normal;  // Get the normal of the intersection
+
+            const quaternion = new THREE.Quaternion();
+            quaternion.setFromUnitVectors(new Vector3(0, 1, 0), normal);
+
+            marker.position.copy(INTERSECTION);
+            marker.quaternion.copy(quaternion);
+        }
     }
 
-    if (INTERSECTION) marker.position.copy(INTERSECTION);
-    marker.position.y += 0.1
-
     marker.visible = INTERSECTION !== undefined;
+    marker.position.y +=0.1;
 
     renderer.render(scene, camera);
 }
+
 
 
 function loadData() {
@@ -261,7 +311,6 @@ async function fetchAndCreateRooms(housingId) {
         const doc = parser.parseFromString(html, 'text/html');
         const rooms = JSON.parse(doc.querySelector('#rooms-data').textContent);
 
-        const loader = new GLTFLoader();
 
         for (const room of rooms) {
 
@@ -272,7 +321,8 @@ async function fetchAndCreateRooms(housingId) {
                     const model = gltf.scene;
                     //add all models to modelList
                     modelList.push(model);
-
+                    model.userData.roomId = room.room_id;
+                    model.userData.housingId = housingId;
 
                     // Calculate model position
                 
