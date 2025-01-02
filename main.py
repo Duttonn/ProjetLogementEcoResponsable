@@ -86,6 +86,9 @@ class Sensor(BaseModel):
     type_id: int
     commercial_reference: str
     communication_port: str
+    x_coordinate: Optional[float] = None
+    y_coordinate: Optional[float] = None
+    z_coordinate: Optional[float] = None
 
 class Measurement(BaseModel):
     sensor_id: int
@@ -403,6 +406,39 @@ def delete_room(room_id: int):
     return {"message": "Pièce supprimée avec succès."}
 
 
+@app.get("/sensors/{housing_id}", response_class=HTMLResponse)
+def get_sensors_by_housing(request: Request, housing_id: int):
+    conn = get_db_connection()
+    logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
+    sensors_by_room = conn.execute(
+        """
+        SELECT r.name AS room_name, s.sensor_id, s.type_id, s.commercial_reference, s.communication_port, 
+               s.x_coordinate, s.y_coordinate, s.z_coordinate, r.room_id
+        FROM Sensor s
+        JOIN Room r ON s.room_id = r.room_id
+        WHERE r.housing_id = ?
+        ORDER BY r.room_id
+        """, (housing_id,)
+    ).fetchall()
+    rooms = conn.execute("SELECT room_id, name FROM Room WHERE housing_id = ?", (housing_id,)).fetchall()
+    conn.close()
+
+    selected_logement_address = next(
+        (logement["address"] for logement in logements if logement["housing_id"] == housing_id), None
+    )
+
+    return templates.TemplateResponse(
+        "configuration.html",
+        {
+            "request": request,
+            "logements": logements,
+            "sensors_by_room": sensors_by_room,
+            "rooms": rooms,
+            "selected_id": housing_id,
+            "selected_logement_address": selected_logement_address,
+        },
+    )
+
 @app.post("/sensors")
 def add_sensor(sensor: Sensor):
     print(f"Reçu : {sensor}")  # DEBUG : Voir les données reçues
@@ -410,10 +446,11 @@ def add_sensor(sensor: Sensor):
     try:
         conn.execute(
             """
-            INSERT INTO Sensor (room_id, type_id, commercial_reference, communication_port)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO Sensor (room_id, type_id, commercial_reference, communication_port, x_coordinate, y_coordinate, z_coordinate)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (sensor.room_id, sensor.type_id, sensor.commercial_reference, sensor.communication_port)
+            (sensor.room_id, sensor.type_id, sensor.commercial_reference, sensor.communication_port, 
+             sensor.x_coordinate, sensor.y_coordinate, sensor.z_coordinate),
         )
         conn.commit()
     except sqlite3.Error as e:
@@ -421,6 +458,27 @@ def add_sensor(sensor: Sensor):
     finally:
         conn.close()
     return {"message": "Capteur ajouté avec succès."}
+
+@app.put("/sensors/{sensor_id}")
+def update_sensor(sensor_id: int, sensor: Sensor):
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            """
+            UPDATE Sensor 
+            SET room_id = ?, type_id = ?, commercial_reference = ?, communication_port = ?, 
+                x_coordinate = ?, y_coordinate = ?, z_coordinate = ?
+            WHERE sensor_id = ?
+            """,
+            (sensor.room_id, sensor.type_id, sensor.commercial_reference, sensor.communication_port, 
+             sensor.x_coordinate, sensor.y_coordinate, sensor.z_coordinate, sensor_id),
+        )
+        conn.commit()
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
+    finally:
+        conn.close()
+    return {"message": "Capteur mis à jour avec succès."}
 
 
 
@@ -436,23 +494,6 @@ def delete_sensor(sensor_id: int):
         conn.close()
     return {"message": "Capteur supprimé avec succès."}
 
-@app.put("/sensors/{sensor_id}")
-def update_sensor(sensor_id: int, sensor: Sensor):
-    conn = get_db_connection()
-    try:
-        conn.execute(
-            """
-            UPDATE Sensor SET room_id = ?, type_id = ?, commercial_reference = ?, communication_port = ?
-            WHERE sensor_id = ?
-            """,
-            (sensor.room_id, sensor.type_id, sensor.commercial_reference, sensor.communication_port, sensor_id)
-        )
-        conn.commit()
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=400, detail=f"Erreur lors de la mise à jour: {e}")
-    finally:
-        conn.close()
-    return {"message": "Capteur mis à jour avec succès."}
 
 # Gestion des mesures
 @app.post("/measurements")
@@ -538,30 +579,6 @@ def consommation_par_logement(request: Request, logement_id: int = None):
     })
 
 
-@app.get("/sensors/{housing_id}", response_class=HTMLResponse)
-def get_sensors_by_housing(request: Request, housing_id: int):
-    conn = get_db_connection()
-    logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
-    sensors_by_room = conn.execute("""
-        SELECT r.name AS room_name, s.sensor_id, s.type_id, s.commercial_reference, s.communication_port, r.room_id
-        FROM Sensor s
-        JOIN Room r ON s.room_id = r.room_id
-        WHERE r.housing_id = ?
-        ORDER BY r.room_id
-    """, (housing_id,)).fetchall()
-    rooms = conn.execute("SELECT room_id, name FROM Room WHERE housing_id = ?", (housing_id,)).fetchall()
-    conn.close()
-
-    selected_logement_address = next((logement['address'] for logement in logements if logement['housing_id'] == housing_id), None)
-
-    return templates.TemplateResponse("configuration.html", {
-        "request": request,
-        "logements": logements,
-        "sensors_by_room": sensors_by_room,
-        "rooms": rooms,
-        "selected_id": housing_id,
-        "selected_logement_address": selected_logement_address
-    })
 
 @app.get("/measurements/{sensor_id}", response_class=HTMLResponse)
 def get_sensor_measurements(request: Request, sensor_id: int):

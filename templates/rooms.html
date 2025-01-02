@@ -284,7 +284,9 @@
 
         <div class="actions">
             <button class="btn" onclick="openAddModal()">+ Ajouter une Pièce</button>
-            <button class="btn" onclick="deleteSelected()">Supprimer</button>
+            <button class="btn" onclick="location.href='https://localhost:8000/floormap/{{ selected_id }}'">
+                + FloorPlanner
+            </button>            <button class="btn" onclick="deleteSelected()">Supprimer</button>
         </div>
 
         {% if rooms %}
