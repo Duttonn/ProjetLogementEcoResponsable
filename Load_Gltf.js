@@ -27,6 +27,15 @@ let controllerGrip1, controllerGrip2;
 
 let room, marker, floor, baseReferenceSpace;
 
+let lastIntersectionData = {
+    roomId: null,
+    housingId: null,
+    intersectPoint: null,
+    normal: null
+};
+
+
+
 let INTERSECTION;
 let normal;
 const tempMatrix = new THREE.Matrix4();
@@ -63,7 +72,7 @@ function init() {
     const grassTexture = new THREE.TextureLoader().load('/static/textures/grass.jpg');
     grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
     grassTexture.repeat.set(50, 50);
-    
+
     const floorGeometry = new THREE.PlaneGeometry(floorSize, floorSize);
     const floorMaterial = new THREE.MeshStandardMaterial({ map: grassTexture });
     floor = new THREE.Mesh(floorGeometry, floorMaterial);
@@ -114,40 +123,78 @@ function init() {
 
     }
 
+
+
+
+
+
     function onSelectEndSensor() {
         this.userData.isPlacingSensor = false;
     
-        if (INTERSECTION) {
-            const intersectPoint = INTERSECTION.clone();  // Clone to prevent changes
-            const intersectNormal = normal.clone();
-
-            // const intersectedRoomId = INTERSECTION.object.userData.roomId || 'unknown';
-            // const intersectedHousingId = INTERSECTION.object.userData.housingId || 'unknown';
-
+        if (lastIntersectionData.intersectPoint) {
+            const intersectPoint = lastIntersectionData.intersectPoint;
+            const intersectNormal = lastIntersectionData.normal;
+            const intersectedRoomId = lastIntersectionData.roomId || -1;
     
             const gltfPath = `/static/models/sensor.glb`;
     
             loader.load(gltfPath, (gltf) => {
                 const model = gltf.scene;
     
-                // Scale down the model by 10
                 model.scale.set(0.01, 0.01, 0.01);
-
-    
-                // Set the model position to the saved intersection point
                 model.position.copy(intersectPoint);
     
-                // Apply orientation based on the normal
                 const quaternion = new THREE.Quaternion();
                 quaternion.setFromUnitVectors(new Vector3(0, 1, 0), intersectNormal);
                 model.quaternion.copy(quaternion);
     
                 scene.add(model);
-                console.log("Added sensor at:", model.position);
+                console.log(`Added sensor at: ${model.position.toArray()}, Room ID: ${intersectedRoomId}`);
+    
+                // POST request to backend
+                const sensorData = {
+                    room_id: intersectedRoomId,
+                    type_id: 1,  // temp sensor
+                    commercial_reference: Math.floor(Math.random() * 100000).toString(),
+                    communication_port: "default_port",
+                    x_coordinate: intersectPoint.x || 0,
+                    y_coordinate: intersectPoint.y || 0,
+                    z_coordinate: intersectPoint.z || 0
+                };
+    
+                fetch("/sensors", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(sensorData)
+                })
+                .then(response => {
+                    if (response.ok) {
+                        console.log("Sensor added successfully.");
+                    } else {
+                        console.error("Failed to add sensor.");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error posting sensor:", error);
+                });
+    
+                // Reset intersection data
+                lastIntersectionData = {
+                    roomId: null,
+                    housingId: null,
+                    intersectPoint: null,
+                    normal: null
+                };
             });
+        } else {
+            console.error("No valid intersection data for sensor placement.");
         }
     }
     
+
+
 
     controllerLeft = renderer.xr.getController(0);
     controllerLeft.addEventListener('selectstart', onSelectStartSensor);
@@ -238,8 +285,6 @@ function onWindowResize() {
 //
 function animate() {
     INTERSECTION = undefined;
-    const obj = modelList;
-    obj.push(floor);
 
     if (controllerLeft.userData.isPlacingSensor === true) {
         tempMatrix.identity().extractRotation(controllerLeft.matrixWorld);
@@ -247,17 +292,23 @@ function animate() {
         raycaster.ray.origin.setFromMatrixPosition(controllerLeft.matrixWorld);
         raycaster.ray.direction.set(0, 0, - 1).applyMatrix4(tempMatrix);
 
-        const intersects = raycaster.intersectObjects(obj);
+        const intersects = raycaster.intersectObjects(modelList, true);
 
         if (intersects.length > 0) {
             INTERSECTION = intersects[0].point;
-            normal = intersects[0].face.normal; // Get the normal of the intersection
+            normal = intersects[0].face.normal;  // Get the normal of the intersection
 
-            // Create a quaternion rotation based on the normal
             const quaternion = new THREE.Quaternion();
             quaternion.setFromUnitVectors(new Vector3(0, 1, 0), normal);
 
-            // Apply rotation to the marker
+            const intersectObject = intersects[0].object;
+
+            // Store intersection data globally
+            lastIntersectionData.roomId = intersectObject.userData.roomId;
+            lastIntersectionData.housingId = intersectObject.userData.housingId;
+            lastIntersectionData.intersectPoint = INTERSECTION.clone();
+            lastIntersectionData.normal = normal.clone();
+
             marker.position.copy(INTERSECTION);
             marker.quaternion.copy(quaternion);
         }
@@ -266,7 +317,8 @@ function animate() {
 
         raycaster.ray.origin.setFromMatrixPosition(controllerRight.matrixWorld);
         raycaster.ray.direction.set(0, 0, - 1).applyMatrix4(tempMatrix);
-
+        const obj = modelList;
+        obj.push(floor);
         const intersects = raycaster.intersectObjects(obj);
 
         if (intersects.length > 0) {
@@ -276,13 +328,24 @@ function animate() {
             const quaternion = new THREE.Quaternion();
             quaternion.setFromUnitVectors(new Vector3(0, 1, 0), normal);
 
+            const intersectObject = intersects[0].object;
+            console.log("Intersected Object (full):", intersectObject);
+            console.log("Intersected Mesh Name:", intersectObject.name);
+            console.log("Room ID (userData):", intersectObject.userData.roomId);
+            console.log("Parent Room ID (fallback):", intersectObject.parent?.userData?.roomId);
+        
+            const intersectedRoomId = intersectObject.userData.roomId ||
+                intersectObject.parent?.userData?.roomId || -1;
+
             marker.position.copy(INTERSECTION);
             marker.quaternion.copy(quaternion);
         }
+
+
     }
 
     marker.visible = INTERSECTION !== undefined;
-    marker.position.y +=0.1;
+    marker.position.y += 0.1;
 
     renderer.render(scene, camera);
 }
@@ -322,20 +385,30 @@ async function fetchAndCreateRooms(housingId) {
                     const model = gltf.scene;
                     //add all models to modelList
                     modelList.push(model);
+
+                    // Attach room_id to userData
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.userData.roomId = room.room_id;
+                            child.userData.housingId = housingId;
+                            modelList.push(child);
+                        }
+                    });
+
                     model.userData.roomId = room.room_id;
                     model.userData.housingId = housingId;
 
                     // Calculate model position
-                
+
                     // Align model to the ground or upper floor by adjusting bounding box
                     model.position.set(
                         room.x,
-                        room.y ,  // Ensure model sits on the floor
+                        room.y,  // Ensure model sits on the floor
                         room.z
                     );
-                
+
                     console.log("Added GLTF at:", model.position);
-                
+
 
                     scene.add(model);
                 });
@@ -360,8 +433,8 @@ async function fetchLogementsAndCreateRooms() {
         const logements = JSON.parse(doc.querySelector('#housing-data').textContent);
         console.log("housing number", logements.length);
         for (const logement of logements) {
-            await fetchAndCreateRooms(logement.housing_id);            
-               }
+            await fetchAndCreateRooms(logement.housing_id);
+        }
     } catch (error) {
         console.error("Failed to fetch logements:", error);
     }
