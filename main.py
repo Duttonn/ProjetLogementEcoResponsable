@@ -270,6 +270,27 @@ def supprimer_facture(request: Request, invoice_id: int):
     return templates.TemplateResponse("message.html", {"request": request, "message": "Facture supprimée avec succès"})
 
 
+@app.get("/floormap/{housing_id}", response_class=HTMLResponse)
+def get_floormap_for_housing(request: Request, housing_id: int):
+    conn = get_db_connection()
+    logements = conn.execute("SELECT housing_id, address FROM Housing").fetchall()
+    rooms = conn.execute("SELECT * FROM Room WHERE housing_id = ?", (housing_id,)).fetchall()
+    logement_address = next((logement["address"] for logement in logements if logement["housing_id"] == housing_id), "Logement par Défaut")
+    conn.close()
+
+    logements_list = [dict(logement) for logement in logements]
+    rooms_list = [dict(room) for room in rooms]
+
+    return templates.TemplateResponse("floormap.html", {
+        "request": request,
+        "logements": logements_list,
+        "rooms": rooms_list,
+        "selected_id": housing_id,
+        "selected_logement_address": logement_address
+    })
+
+
+
 @app.get("/rooms/{housing_id}", response_class=HTMLResponse)
 def get_rooms_for_housing(request: Request, housing_id: int):
     conn = get_db_connection()
