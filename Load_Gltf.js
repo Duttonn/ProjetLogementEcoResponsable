@@ -121,8 +121,9 @@ function init() {
             const intersectPoint = INTERSECTION.clone();  // Clone to prevent changes
             const intersectNormal = normal.clone();
 
-            const intersectedRoomId = INTERSECTION.object.userData.roomId || 'unknown';
-            const intersectedHousingId = INTERSECTION.object.userData.housingId || 'unknown';
+            // const intersectedRoomId = INTERSECTION.object.userData.roomId || 'unknown';
+            // const intersectedHousingId = INTERSECTION.object.userData.housingId || 'unknown';
+
     
             const gltfPath = `/static/models/sensor.glb`;
     
