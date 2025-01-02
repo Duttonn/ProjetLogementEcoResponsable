@@ -162,6 +162,10 @@
 
       <!-- Contenu Principal -->
       <div class="content">
+
+            <div id="sensor-data" style="display: none;">
+                  {{ sensors_by_room | tojson | safe }}
+              </div>
             <h2 class="text-center">Capteurs pour {{ selected_logement_address or 'Logement par Défaut' }}</h2>
 
             <div class="actions">

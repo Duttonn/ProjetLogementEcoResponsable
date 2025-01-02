@@ -405,7 +405,6 @@ def delete_room(room_id: int):
         conn.close()
     return {"message": "Pièce supprimée avec succès."}
 
-
 @app.get("/sensors/{housing_id}", response_class=HTMLResponse)
 def get_sensors_by_housing(request: Request, housing_id: int):
     conn = get_db_connection()
@@ -423,6 +422,9 @@ def get_sensors_by_housing(request: Request, housing_id: int):
     rooms = conn.execute("SELECT room_id, name FROM Room WHERE housing_id = ?", (housing_id,)).fetchall()
     conn.close()
 
+    # Convert sqlite3.Row objects to dictionaries
+    sensors_by_room = [dict(sensor) for sensor in sensors_by_room]
+
     selected_logement_address = next(
         (logement["address"] for logement in logements if logement["housing_id"] == housing_id), None
     )
@@ -438,6 +440,7 @@ def get_sensors_by_housing(request: Request, housing_id: int):
             "selected_logement_address": selected_logement_address,
         },
     )
+
 
 @app.post("/sensors")
 def add_sensor(sensor: Sensor):
