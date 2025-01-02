@@ -12,12 +12,17 @@ import {
     PlaneGeometry,
     TextureLoader,
     RepeatWrapping,
+    DirectionalLight,
     Clock,
-    Vector3
+    Vector3,
+    Raycaster,
+    CylinderGeometry,
+    Color
 } from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 
 // Scene and renderer setup
 const scene = new Scene();
@@ -35,6 +40,10 @@ document.body.appendChild(VRButton.createButton(renderer));
 const light = new HemisphereLight(0xffffff, 0x444444, 1);
 scene.add(light);
 
+const directionalLight = new DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(50, 100, 50);
+scene.add(directionalLight);
+
 // Orbit Controls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.listenToKeyEvents(window);
@@ -50,12 +59,57 @@ const floorMaterial = new MeshStandardMaterial({ map: grassTexture });
 const floor = new Mesh(floorGeometry, floorMaterial);
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
-// Room Dictionary to track positions and sizes
 
+// Teleportation Setup
+const raycaster = new Raycaster();
+let teleportMarker;
+const teleportMarkers = [];
 
-let offsetStep = new Vector3(0, 0, 0);;
+// Create teleport marker
+function createTeleportMarker(position) {
+    const geometry = new CylinderGeometry(0.3, 0.3, 0.1, 32);
+    const material = new MeshBasicMaterial({ color: new Color(0x00ff00) });
+    teleportMarker = new Mesh(geometry, material);
+    teleportMarker.position.copy(position);
+    scene.add(teleportMarker);
+    teleportMarkers.push(teleportMarker);
+}
 
-// Fetch and Create Room
+// Add teleportation points
+createTeleportMarker(new Vector3(0, 0.1, -5));
+createTeleportMarker(new Vector3(5, 0.1, -10));
+createTeleportMarker(new Vector3(-5, 0.1, -10));
+
+// Controller Setup
+const controller1 = renderer.xr.getController(0);
+const controller2 = renderer.xr.getController(1);
+scene.add(controller1);
+scene.add(controller2);
+
+// Teleportation Logic
+function teleport(target) {
+    if (target) {
+        camera.position.set(target.x, camera.position.y, target.z);
+    }
+}
+
+controller1.addEventListener('selectstart', () => {
+    raycaster.setFromCamera(new Vector3(0, 0, -1), camera);
+    const intersects = raycaster.intersectObjects(teleportMarkers);
+    if (intersects.length > 0) {
+        teleport(intersects[0].point);
+    }
+});
+
+controller2.addEventListener('selectstart', () => {
+    raycaster.setFromCamera(new Vector3(0, 0, -1), camera);
+    const intersects = raycaster.intersectObjects(teleportMarkers);
+    if (intersects.length > 0) {
+        teleport(intersects[0].point);
+    }
+});
+
+// GLTF Model Loading
 async function fetchAndCreateRooms(housingId) {
     try {
         const response = await fetch(`/rooms/${housingId}`);
@@ -67,63 +121,18 @@ async function fetchAndCreateRooms(housingId) {
         const loader = new GLTFLoader();
 
         for (const room of rooms) {
-
             if (room.gltf_model) {
                 const gltfPath = `/static/models/${room.gltf_model.split('/').pop()}`;
-
                 loader.load(gltfPath, (gltf) => {
                     const model = gltf.scene;
-                
-                    // Calculate model position
-                
-                    // Align model to the ground or upper floor by adjusting bounding box
-                    model.position.set(
-                        room.x,
-                        room.y ,  // Ensure model sits on the floor
-                        room.z
-                    );
-                
-                    console.log("Added GLTF at:", model.position);
-                
-
+                    model.position.set(room.x, room.y, room.z);
                     scene.add(model);
                 });
-
-            } else {
-                // Place a default cube at room coordinates if no GLTF model exists
-                addCube(room.x, room.y, room.z);
             }
         }
     } catch (error) {
         console.error("Failed to fetch rooms:", error);
     }
-}
-
-
-
-
-
-// Helper to create and position cubes if no model exists
-function addCube(x, y, z) {
-    const geometry = new BoxGeometry(2, 2, 2);
-    const material = new MeshBasicMaterial({ color: Math.random() * 0xffffff });
-    const cube = new Mesh(geometry, material);
-    cube.position.set(x, y + 1, z);
-    scene.add(cube);
-}
-
-
-
-// GLTF Loader (Optional for House Model)
-function loadData() {
-    // Load 3D house model
-    new GLTFLoader()
-        .setPath('assets/models/')
-        .load('house_model.glb', (gltf) => {
-            const model = gltf.scene;
-            model.position.set(0, 0, 0);
-            scene.add(model);
-        });
 }
 
 // Animation Loop
@@ -147,13 +156,24 @@ async function fetchLogementsAndCreateRooms() {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         const logements = JSON.parse(doc.querySelector('#housing-data').textContent);
-        console.log("housing number", logements.length);
         for (const logement of logements) {
-            await fetchAndCreateRooms(logement.housing_id);            
-               }
+            await fetchAndCreateRooms(logement.housing_id);
+        }
     } catch (error) {
         console.error("Failed to fetch logements:", error);
     }
+}
+
+// GLTF Loader (Optional for House Model)
+function loadData() {
+    // Load 3D house model
+    new GLTFLoader()
+        .setPath('assets/models/')
+        .load('house_model.glb', (gltf) => {
+            const model = gltf.scene;
+            model.position.set(0, 0, 0);
+            scene.add(model);
+        });
 }
 
 fetchLogementsAndCreateRooms();

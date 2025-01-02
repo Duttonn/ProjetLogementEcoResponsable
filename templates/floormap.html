@@ -85,6 +85,7 @@
             PlaneGeometry,
             Box3,
             TextureLoader,
+            DirectionalLight,
             RepeatWrapping,
             Vector3
         } from 'https://cdn.skypack.dev/three@0.129.0/build/three.module.js';
@@ -102,6 +103,10 @@
 
         const light = new HemisphereLight(0xffffff, 0x444444, 1);
         scene.add(light);
+
+        const directionalLight = new DirectionalLight(0xffffff, 0.2);
+        directionalLight.position.set(50, 100, 50);  // Strong overhead light
+        scene.add(directionalLight);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         // controls.enableRotate = false;
@@ -131,17 +136,15 @@
                 console.log(rooms)
                 const loader = new GLTFLoader();
                 const roomSelector = document.getElementById('roomSelector');
-                let spacing = 10;
 
                 for (const [index, room] of rooms.entries()) {
-                    const offsetPosition = index * spacing;
 
                     if (room.gltf_model) {
                         const gltfPath = `/static/models/${room.gltf_model.split('/').pop()}`;
                         loader.load(gltfPath, (gltf) => {
                             const model = new Mesh();
                             model.add(gltf.scene);
-                            model.position.set(offsetPosition, 0, offsetPosition);
+                            model.position.set(room.x, room.y, room.z);
                             model.userData.roomId = String(room.room_id);
                             console.log(model.userData.roomId)
                             roomDictionary[String(room.room_id)] = model;
@@ -166,7 +169,24 @@
                                 room.z
                             );
 
+                            // Update room Y-coordinate in the database
+                            const formData = new FormData();
+                            formData.append("x", model.position.x);
+                            formData.append("y", model.position.y);
+                            formData.append("z", model.position.z);
 
+                            fetch(`/rooms/${room.room_id}`, {
+                                method: 'PUT',
+                                body: formData,
+                            }).then(response => {
+                                if (response.ok) {
+                                    console.log(`Room ${room.room_id} Y-coordinate updated successfully.`);
+                                } else {
+                                    console.error(`Failed to update room ${room.room_id} Y-coordinate.`);
+                                }
+                            }).catch((error) => {
+                                console.error("PUT request error:", error);
+                            });
 
                             scene.add(model);
                         });
