@@ -50,14 +50,17 @@ precision_range VARCHAR(20) -- Plage de précision pour ce type de capteur
 
 -- Créer la table Sensor pour stocker les informations sur les capteurs/actionneurs installés dans les pièces
 CREATE TABLE Sensor (
-sensor_id INTEGER PRIMARY KEY, -- Identifiant unique pour chaque capteur ou actionneur
-room_id INTEGER, -- Référence à la pièce où le capteur est installé
-type_id INTEGER, -- Référence au type de capteur/actionneur
-commercial_reference VARCHAR(50), -- Référence commerciale du capteur/actionneur
-communication_port VARCHAR(50), -- Port utilisé pour la communication avec le capteur/actionneur
-insert_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Horodatage de l'ajout de l'enregistrement du capteur
-FOREIGN KEY (room_id) REFERENCES Room(room_id), -- Lien entre le capteur et une pièce spécifique
-FOREIGN KEY (type_id) REFERENCES SensorType(type_id) -- Lien entre le capteur et un type spécifique
+    sensor_id INTEGER PRIMARY KEY, -- Identifiant unique pour chaque capteur ou actionneur
+    room_id INTEGER, -- Référence à la pièce où le capteur est installé
+    type_id INTEGER, -- Référence au type de capteur/actionneur
+    commercial_reference VARCHAR(50), -- Référence commerciale du capteur/actionneur
+    communication_port VARCHAR(50), -- Port utilisé pour la communication avec le capteur/actionneur
+    x_coordinate FLOAT, -- Coordonnée X du capteur
+    y_coordinate FLOAT, -- Coordonnée Y du capteur
+    z_coordinate FLOAT, -- Coordonnée Z du capteur
+    insert_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Horodatage de l'ajout de l'enregistrement du capteur
+    FOREIGN KEY (room_id) REFERENCES Room(room_id), -- Lien entre le capteur et une pièce spécifique
+    FOREIGN KEY (type_id) REFERENCES SensorType(type_id) -- Lien entre le capteur et un type spécifique
 );
 
 -- Créer la table Measurements pour stocker les données collectées par les capteurs
@@ -93,12 +96,11 @@ VALUES (3, 'Motion Detector', 'Boolean', '0 - 1');
 INSERT INTO SensorType (type_id, name, unit_of_measurement, precision_range)
 VALUES (4, 'CO2 Sensor', 'percentage', '0 - 100');
 
--- Ajouter des capteurs/actionneurs aux pièces
-INSERT INTO Sensor (sensor_id, room_id, type_id, commercial_reference, communication_port, insert_date)
-VALUES (1, 1, 1, 'Ref1234', 'PortA', CURRENT_TIMESTAMP);
+INSERT INTO Sensor (sensor_id, room_id, type_id, commercial_reference, communication_port, x_coordinate, y_coordinate, z_coordinate, insert_date)
+VALUES (1, 1, 1, 'Ref1234', 'PortA', 0, 0, 0, CURRENT_TIMESTAMP);
 
-INSERT INTO Sensor (sensor_id, room_id, type_id, commercial_reference, communication_port, insert_date)
-VALUES (2, 2, 2, 'Ref5678', 'PortB', CURRENT_TIMESTAMP);
+INSERT INTO Sensor (sensor_id, room_id, type_id, commercial_reference, communication_port, x_coordinate, y_coordinate, z_coordinate, insert_date)
+VALUES (2, 2, 2, 'Ref5678', 'PortB', 0, 0, 0, CURRENT_TIMESTAMP);
 
 
 INSERT INTO Measurements (measurement_id, sensor_id, value, insert_date)

@@ -179,9 +179,12 @@
                               <h4>Type : {{ sensor.type }}</h4>
                               <p><strong>Référence :</strong> {{ sensor.commercial_reference }}</p>
                               <p><strong>Port :</strong> {{ sensor.communication_port }}</p>
+                              <p><strong>Coordonnées :</strong> ({{ sensor.x_coordinate }}, {{ sensor.y_coordinate }},
+                                    {{ sensor.z_coordinate }})</p>
+
 
                               <button class="btn"
-                                    onclick="openEditModal('{{ sensor.sensor_id }}', '{{ sensor.room_id }}', '{{ sensor.type_id }}', '{{ sensor.commercial_reference }}', '{{ sensor.communication_port }}')">
+                                    onclick="openEditModal('{{ sensor.sensor_id }}', '{{ sensor.room_id }}', '{{ sensor.type_id }}', '{{ sensor.commercial_reference }}', '{{ sensor.communication_port }}', '{{ sensor.x_coordinate }}', '{{ sensor.y_coordinate }}', '{{ sensor.z_coordinate }}')">
                                     Modifier
                               </button>
 
@@ -233,6 +236,10 @@
             <input type="text" id="addType" placeholder="Type">
             <input type="text" id="addReference" placeholder="Référence">
             <input type="text" id="addPort" placeholder="Port">
+            <input type="number" id="addXCoordinate" placeholder="Coordonnée X">
+            <input type="number" id="addYCoordinate" placeholder="Coordonnée Y">
+            <input type="number" id="addZCoordinate" placeholder="Coordonnée Z">
+
             <button class="btn" onclick="addSensor()">Ajouter</button>
             <button class="btn" onclick="closeAddModal()">Annuler</button>
       </div>
@@ -254,6 +261,9 @@
             <input type="text" id="editType" placeholder="Type">
             <input type="text" id="editReference" placeholder="Référence">
             <input type="text" id="editPort" placeholder="Port">
+            <input type="number" id="editXCoordinate" placeholder="Coordonnée X">
+            <input type="number" id="editYCoordinate" placeholder="Coordonnée Y">
+            <input type="number" id="editZCoordinate" placeholder="Coordonnée Z">
             <button class="btn" onclick="saveChanges()">Enregistrer</button>
             <button class="btn" onclick="closeEditModal()">Annuler</button>
       </div>
@@ -305,6 +315,9 @@
             const reference = document.getElementById("addReference").value;
             const port = document.getElementById("addPort").value;
             const roomId = document.getElementById("addRoomId").value;
+            const x = document.getElementById("addXCoordinate").value;
+            const y = document.getElementById("addYCoordinate").value;
+            const z = document.getElementById("addZCoordinate").value;
 
             if (!type || !reference || !port || !roomId) {
                   alert("Veuillez remplir tous les champs correctement.");
@@ -318,7 +331,10 @@
                         room_id: parseInt(roomId),
                         type_id: 1,
                         commercial_reference: reference,
-                        communication_port: port
+                        communication_port: port,
+                        x_coordinate: x,
+                        y_coordinate: y,
+                        z_coordinate: z
                   })
             });
 
@@ -331,27 +347,41 @@
             closeAddModal();
       }
 
-      function openEditModal(sensorId, roomId, typeId, reference, port) {
+
+      function openEditModal(sensorId, roomId, typeId, reference, port, x, y, z) {
             document.getElementById("editSensorId").value = sensorId;
             document.getElementById("editRoomId").value = roomId || ""; // Null pour les capteurs non assignés
             document.getElementById("editType").value = typeId;
             document.getElementById("editReference").value = reference;
             document.getElementById("editPort").value = port;
+            document.getElementById("editXCoordinate").value = x || 0;
+            document.getElementById("editYCoordinate").value = y || 0;
+            document.getElementById("editZCoordinate").value = z || 0;
             editModal.style.display = "flex";
       }
 
-
       async function saveChanges() {
             const sensorId = document.getElementById("editSensorId").value;
-            const roomId = document.getElementById("editRoomId").value || null; // Null si non assigné
+            const roomId = document.getElementById("editRoomId").value || null;
             const typeId = document.getElementById("editType").value;
             const reference = document.getElementById("editReference").value;
             const port = document.getElementById("editPort").value;
+            const x = document.getElementById("editXCoordinate").value;
+            const y = document.getElementById("editYCoordinate").value;
+            const z = document.getElementById("editZCoordinate").value;
 
             const response = await fetch(`/sensors/${sensorId}`, {
                   method: "PUT",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ room_id: roomId, type_id: typeId, commercial_reference: reference, communication_port: port })
+                  body: JSON.stringify({
+                        room_id: roomId,
+                        type_id: typeId,
+                        commercial_reference: reference,
+                        communication_port: port,
+                        x_coordinate: x,
+                        y_coordinate: y,
+                        z_coordinate: z
+                  })
             });
 
             if (response.ok) {
@@ -361,6 +391,7 @@
                   alert("Erreur lors de la mise à jour du capteur.");
             }
       }
+
 
 
 
