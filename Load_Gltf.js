@@ -1,4 +1,4 @@
-"use strict";
+import * as THREE from 'three';
 
 import {
     PerspectiveCamera,
@@ -12,159 +12,232 @@ import {
     PlaneGeometry,
     TextureLoader,
     RepeatWrapping,
-    DirectionalLight,
     Clock,
-    Vector3,
-    Raycaster,
-    CylinderGeometry,
-    Color
+    Vector3
 } from 'three';
-import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 
-// Scene and renderer setup
-const scene = new Scene();
-const aspect = window.innerWidth / window.innerHeight;
-const camera = new PerspectiveCamera(75, aspect, 0.1, 1000);
-camera.position.set(0, 5, 15);
+import { BoxLineGeometry } from 'three/addons/geometries/BoxLineGeometry.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-const renderer = new WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true;
-document.body.appendChild(renderer.domElement);
-document.body.appendChild(VRButton.createButton(renderer));
+let camera, scene, raycaster, renderer;
+let controller1, controller2;
+let controllerGrip1, controllerGrip2;
 
-// Lighting
-const light = new HemisphereLight(0xffffff, 0x444444, 1);
-scene.add(light);
+let room, marker, floor, baseReferenceSpace;
 
-const directionalLight = new DirectionalLight(0xffffff, 0.8);
-directionalLight.position.set(50, 100, 50);
-scene.add(directionalLight);
+let INTERSECTION;
+const tempMatrix = new THREE.Matrix4();
 
-// Orbit Controls
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.listenToKeyEvents(window);
+init();
 
-// Floor (Grass Texture)
-const floorSize = 50;
-const grassTexture = new TextureLoader().load('/static/textures/grass.jpg');
-grassTexture.wrapS = grassTexture.wrapT = RepeatWrapping;
-grassTexture.repeat.set(50, 50);
+function init() {
 
-const floorGeometry = new PlaneGeometry(floorSize, floorSize);
-const floorMaterial = new MeshStandardMaterial({ map: grassTexture });
-const floor = new Mesh(floorGeometry, floorMaterial);
-floor.rotation.x = -Math.PI / 2;
-scene.add(floor);
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x505050);
 
-// Teleportation Setup
-const raycaster = new Raycaster();
-let teleportMarker;
-const teleportMarkers = [];
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 1, 3);
 
-// Create teleport marker
-function createTeleportMarker(position) {
-    const geometry = new CylinderGeometry(0.3, 0.3, 0.1, 32);
-    const material = new MeshBasicMaterial({ color: new Color(0x00ff00) });
-    teleportMarker = new Mesh(geometry, material);
-    teleportMarker.position.copy(position);
-    scene.add(teleportMarker);
-    teleportMarkers.push(teleportMarker);
-}
+    scene.add(new THREE.HemisphereLight(0xa5a5a5, 0x898989, 3));
 
-// Add teleportation points
-createTeleportMarker(new Vector3(0, 0.1, -5));
-createTeleportMarker(new Vector3(5, 0.1, -10));
-createTeleportMarker(new Vector3(-5, 0.1, -10));
+    const light = new THREE.DirectionalLight(0xffffff, 3);
+    light.position.set(1, 1, 1).normalize();
+    scene.add(light);
 
-// Controller Setup
-const controller1 = renderer.xr.getController(0);
-const controller2 = renderer.xr.getController(1);
-scene.add(controller1);
-scene.add(controller2);
+    marker = new THREE.Mesh(
+        new THREE.CircleGeometry(0.25, 32).rotateX(- Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: 0xbcbcbc })
+    );
+    scene.add(marker);
 
-// Teleportation Logic
-function teleport(target) {
-    if (target) {
-        camera.position.set(target.x, camera.position.y, target.z);
+
+
+    // Floor (Grass Texture)
+    const floorSize = 50;
+    const grassTexture = new THREE.TextureLoader().load('/static/textures/grass.jpg');
+    grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
+    grassTexture.repeat.set(50, 50);
+    
+    const floorGeometry = new THREE.PlaneGeometry(floorSize, floorSize);
+    const floorMaterial = new THREE.MeshStandardMaterial({ map: grassTexture });
+    floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    raycaster = new THREE.Raycaster();
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setAnimationLoop(animate);
+
+    renderer.xr.addEventListener('sessionstart', () => baseReferenceSpace = renderer.xr.getReferenceSpace());
+    renderer.xr.enabled = true;
+
+    document.body.appendChild(renderer.domElement);
+    document.body.appendChild(VRButton.createButton(renderer));
+
+    // controllers
+
+    function onSelectStart() {
+
+        this.userData.isSelecting = true;
+
     }
-}
 
-controller1.addEventListener('selectstart', () => {
-    raycaster.setFromCamera(new Vector3(0, 0, -1), camera);
-    const intersects = raycaster.intersectObjects(teleportMarkers);
-    if (intersects.length > 0) {
-        teleport(intersects[0].point);
-    }
-});
+    function onSelectEnd() {
 
-controller2.addEventListener('selectstart', () => {
-    raycaster.setFromCamera(new Vector3(0, 0, -1), camera);
-    const intersects = raycaster.intersectObjects(teleportMarkers);
-    if (intersects.length > 0) {
-        teleport(intersects[0].point);
-    }
-});
+        this.userData.isSelecting = false;
 
-// GLTF Model Loading
-async function fetchAndCreateRooms(housingId) {
-    try {
-        const response = await fetch(`/rooms/${housingId}`);
-        const html = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const rooms = JSON.parse(doc.querySelector('#rooms-data').textContent);
+        if (INTERSECTION) {
 
-        const loader = new GLTFLoader();
+            const offsetPosition = { x: - INTERSECTION.x, y: - INTERSECTION.y, z: - INTERSECTION.z, w: 1 };
+            const offsetRotation = new THREE.Quaternion();
+            const transform = new XRRigidTransform(offsetPosition, offsetRotation);
+            const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace(transform);
 
-        for (const room of rooms) {
-            if (room.gltf_model) {
-                const gltfPath = `/static/models/${room.gltf_model.split('/').pop()}`;
-                loader.load(gltfPath, (gltf) => {
-                    const model = gltf.scene;
-                    model.position.set(room.x, room.y, room.z);
-                    scene.add(model);
-                });
-            }
+            renderer.xr.setReferenceSpace(teleportSpaceOffset);
+
         }
-    } catch (error) {
-        console.error("Failed to fetch rooms:", error);
+
     }
+
+    controller1 = renderer.xr.getController(0);
+    controller1.addEventListener('selectstart', onSelectStart);
+    controller1.addEventListener('selectend', onSelectEnd);
+    controller1.addEventListener('connected', function (event) {
+
+        this.add(buildController(event.data));
+
+    });
+    controller1.addEventListener('disconnected', function () {
+
+        this.remove(this.children[0]);
+
+    });
+    scene.add(controller1);
+
+    controller2 = renderer.xr.getController(1);
+    controller2.addEventListener('selectstart', onSelectStart);
+    controller2.addEventListener('selectend', onSelectEnd);
+    controller2.addEventListener('connected', function (event) {
+
+        this.add(buildController(event.data));
+
+    });
+    controller2.addEventListener('disconnected', function () {
+
+        this.remove(this.children[0]);
+
+    });
+    scene.add(controller2);
+
+    // The XRControllerModelFactory will automatically fetch controller models
+    // that match what the user is holding as closely as possible. The models
+    // should be attached to the object returned from getControllerGrip in
+    // order to match the orientation of the held device.
+
+    const controllerModelFactory = new XRControllerModelFactory();
+
+    controllerGrip1 = renderer.xr.getControllerGrip(0);
+    controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+    scene.add(controllerGrip1);
+
+    controllerGrip2 = renderer.xr.getControllerGrip(1);
+    controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+    scene.add(controllerGrip2);
+
+    //
+
+    window.addEventListener('resize', onWindowResize, false);
+
 }
 
-// Animation Loop
-const clock = new Clock();
-renderer.setAnimationLoop(() => {
-    const delta = clock.getDelta();
-    renderer.render(scene, camera);
-});
+function buildController(data) {
 
-// Handle Window Resize
-window.addEventListener('resize', () => {
+    let geometry, material;
+
+    switch (data.targetRayMode) {
+
+        case 'tracked-pointer':
+
+            geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, - 1], 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute([0.5, 0.5, 0.5, 0, 0, 0], 3));
+
+            material = new THREE.LineBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending });
+
+            return new THREE.Line(geometry, material);
+
+        case 'gaze':
+
+            geometry = new THREE.RingGeometry(0.02, 0.04, 32).translate(0, 0, - 1);
+            material = new THREE.MeshBasicMaterial({ opacity: 0.5, transparent: true });
+            return new THREE.Mesh(geometry, material);
+
+    }
+
+}
+
+function onWindowResize() {
+
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
 
-async function fetchLogementsAndCreateRooms() {
-    try {
-        const response = await fetch('/logements');
-        const html = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const logements = JSON.parse(doc.querySelector('#housing-data').textContent);
-        for (const logement of logements) {
-            await fetchAndCreateRooms(logement.housing_id);
-        }
-    } catch (error) {
-        console.error("Failed to fetch logements:", error);
-    }
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
 }
 
-// GLTF Loader (Optional for House Model)
+//
+
+function animate() {
+
+    INTERSECTION = undefined;
+
+    if (controller1.userData.isSelecting === true) {
+
+        tempMatrix.identity().extractRotation(controller1.matrixWorld);
+
+        raycaster.ray.origin.setFromMatrixPosition(controller1.matrixWorld);
+        raycaster.ray.direction.set(0, 0, - 1).applyMatrix4(tempMatrix);
+
+        const intersects = raycaster.intersectObjects([floor]);
+
+        if (intersects.length > 0) {
+
+            INTERSECTION = intersects[0].point;
+
+        }
+
+    } else if (controller2.userData.isSelecting === true) {
+
+        tempMatrix.identity().extractRotation(controller2.matrixWorld);
+
+        raycaster.ray.origin.setFromMatrixPosition(controller2.matrixWorld);
+        raycaster.ray.direction.set(0, 0, - 1).applyMatrix4(tempMatrix);
+        const obj = modelList
+        obj.push(floor)
+        const intersects = raycaster.intersectObjects(obj);
+
+        if (intersects.length > 0) {
+
+            INTERSECTION = intersects[0].point;
+
+        }
+
+    }
+
+    if (INTERSECTION) marker.position.copy(INTERSECTION);
+    marker.position.y += 0.1
+
+    marker.visible = INTERSECTION !== undefined;
+
+    renderer.render(scene, camera);
+}
+
+
 function loadData() {
     // Load 3D house model
     new GLTFLoader()
@@ -176,6 +249,74 @@ function loadData() {
         });
 }
 
+
+let modelList = []
+
+// Fetch and Create Room
+async function fetchAndCreateRooms(housingId) {
+    try {
+        const response = await fetch(`/rooms/${housingId}`);
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const rooms = JSON.parse(doc.querySelector('#rooms-data').textContent);
+
+        const loader = new GLTFLoader();
+
+        for (const room of rooms) {
+
+            if (room.gltf_model) {
+                const gltfPath = `/static/models/${room.gltf_model.split('/').pop()}`;
+
+                loader.load(gltfPath, (gltf) => {
+                    const model = gltf.scene;
+                    //add all models to modelList
+                    modelList.push(model);
+
+
+                    // Calculate model position
+                
+                    // Align model to the ground or upper floor by adjusting bounding box
+                    model.position.set(
+                        room.x,
+                        room.y ,  // Ensure model sits on the floor
+                        room.z
+                    );
+                
+                    console.log("Added GLTF at:", model.position);
+                
+
+                    scene.add(model);
+                });
+
+            } else {
+                // Place a default cube at room coordinates if no GLTF model exists
+                addCube(room.x, room.y, room.z);
+            }
+        }
+    } catch (error) {
+        console.error("Failed to fetch rooms:", error);
+    }
+}
+
+
+async function fetchLogementsAndCreateRooms() {
+    try {
+        const response = await fetch('/logements');
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const logements = JSON.parse(doc.querySelector('#housing-data').textContent);
+        console.log("housing number", logements.length);
+        for (const logement of logements) {
+            await fetchAndCreateRooms(logement.housing_id);            
+               }
+    } catch (error) {
+        console.error("Failed to fetch logements:", error);
+    }
+}
+
 fetchLogementsAndCreateRooms();
+
 
 export { loadData };
