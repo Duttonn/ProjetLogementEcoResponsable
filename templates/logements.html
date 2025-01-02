@@ -76,6 +76,9 @@
         <!-- Liste des logements -->
         <div class="col-md-8">
             <h2 class="mb-4">Liste des Logements</h2>
+            <div id="housing-data" style="display: none;">
+                {{ logements | tojson | safe }}
+            </div>
             {% for logement in logements %}
             <div class="logement-item d-flex flex-column">
                 <p><strong>Adresse :</strong> {{ logement.address }}</p>

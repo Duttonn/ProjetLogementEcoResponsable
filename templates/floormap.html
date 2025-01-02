@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="{{ url_for('static', path='icons/favicon.ico') }}" type="image/x-icon">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan du Logement - Positionnement des Pièces</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Montserrat', sans-serif;
+            background: linear-gradient(180deg, #e8f5e9, #c8e6c9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #container3D {
+            width: 80%;
+            height: 80%;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="container3D"></div>
+
+    <header>
+        Organiser vos Pièces en 3D
+        <div class="header-subtext">
+            Déplacez les pièces pour ajuster leurs positions dans l'environnement virtuel
+        </div>
+    </header>
+
+    <div id="rooms-data" style="display: none;">
+        {{ rooms | tojson | safe }}
+    </div>
+
+    <div class="controls">
+        <label for="roomSelector">Sélectionner une pièce :</label>
+        <select id="roomSelector"></select>
+        <div>
+            <button onclick="moveRoom('x', 1)">→ Déplacer X +</button>
+            <button onclick="moveRoom('x', -1)">← Déplacer X -</button>
+        </div>
+        <div>
+            <button onclick="moveRoom('z', 1)">↓ Déplacer Z +</button>
+            <button onclick="moveRoom('z', -1)">↑ Déplacer Z -</button>
+        </div>
+        <div>
+            <button onclick="moveRoom('y', 1)">↑ Déplacer Y +</button>
+            <button onclick="moveRoom('y', -1)">↓ Déplacer Y -</button>
+        </div>
+    </div>
+
+    <script type="module">
+        "use strict";
+
+        import {
+            PerspectiveCamera,
+            Scene,
+            WebGLRenderer,
+            BoxGeometry,
+            Mesh,
+            MeshStandardMaterial,
+            HemisphereLight,
+            PlaneGeometry,
+            Box3,
+            TextureLoader,
+            RepeatWrapping,
+            Vector3
+        } from 'https://cdn.skypack.dev/three@0.129.0/build/three.module.js';
+        import { OrbitControls } from 'https://cdn.skypack.dev/three@0.129.0/examples/jsm/controls/OrbitControls.js';
+        import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.129.0/examples/jsm/loaders/GLTFLoader.js';
+
+        const scene = new Scene();
+        const camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 50, 50);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+        document.getElementById("container3D").appendChild(renderer.domElement);
+
+        const light = new HemisphereLight(0xffffff, 0x444444, 1);
+        scene.add(light);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        // controls.enableRotate = false;
+
+        const floorSize = 50;
+        const grassTexture = new TextureLoader().load('/static/textures/grass.jpg');
+        grassTexture.wrapS = grassTexture.wrapT = RepeatWrapping;
+        grassTexture.repeat.set(50, 50);
+
+        const floorGeometry = new PlaneGeometry(floorSize, floorSize);
+        const floorMaterial = new MeshStandardMaterial({ map: grassTexture });
+        const floor = new Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        const roomDictionary = {};
+
+        async function fetchAndCreateRooms(housingId) {
+            try {
+                const roomsDataElement = document.querySelector('#rooms-data');
+                if (!roomsDataElement) {
+                    console.error("No rooms data found.");
+                    return;
+                }
+
+                const rooms = JSON.parse(roomsDataElement.textContent);
+                console.log(rooms)
+                const loader = new GLTFLoader();
+                const roomSelector = document.getElementById('roomSelector');
+                let spacing = 10;
+
+                for (const [index, room] of rooms.entries()) {
+                    const offsetPosition = index * spacing;
+
+                    if (room.gltf_model) {
+                        const gltfPath = `/static/models/${room.gltf_model.split('/').pop()}`;
+                        loader.load(gltfPath, (gltf) => {
+                            const model = new Mesh();
+                            model.add(gltf.scene);
+                            model.position.set(offsetPosition, 0, offsetPosition);
+                            model.userData.roomId = String(room.room_id);
+                            console.log(model.userData.roomId)
+                            roomDictionary[String(room.room_id)] = model;
+                            roomSelector.add(new Option(`Pièce ${room.name}`, String(room.room_id)));
+
+                            const box = new Box3().setFromObject(model);
+                            if (box.isEmpty()) {
+                                model.traverse((child) => {
+                                    if (child.isMesh) {
+                                        child.geometry.computeBoundingBox();
+                                        child.geometry.boundingBox.applyMatrix4(child.matrixWorld);
+                                        box.union(child.geometry.boundingBox);
+                                    }
+                                });
+                            }
+
+                            let modelSize = box.getSize(new Vector3());
+                            // Align model to the ground or upper floor by adjusting bounding box
+                            model.position.set(
+                                room.x,
+                                room.y - box.min.y,  // Ensure model sits on the floor
+                                room.z
+                            );
+
+
+
+                            scene.add(model);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch rooms:", error);
+            }
+        }
+
+        window.moveRoom = async (axis, direction) => {
+            const roomId = document.getElementById('roomSelector').value;
+            if (roomId && roomDictionary[roomId]) {
+                const room = roomDictionary[roomId];
+                room.position[axis] += direction * 1;
+                renderer.render(scene, camera);
+
+                // Prepare FormData to match rooms.html behavior
+                const formData = new FormData();
+                formData.append(axis, room.position[axis]);
+                formData.append("room_id", room.userData.roomId);
+
+                await fetch(`/rooms/${room.userData.roomId}`, {
+                    method: 'PUT',
+                    body: formData,
+                });
+            }
+        };
+
+        fetchAndCreateRooms({{ selected_id }});
+
+        renderer.setAnimationLoop(() => {
+            renderer.render(scene, camera);
+        });
+    </script>
+
+</body>
+
+</html>
