@@ -415,7 +415,7 @@ async function fetchAndCreateRooms(housingId) {
 
             } else {
                 // Place a default cube at room coordinates if no GLTF model exists
-                addCube(room.x, room.y, room.z);
+                console.log("add cube")
             }
         }
     } catch (error) {
@@ -434,9 +434,44 @@ async function fetchLogementsAndCreateRooms() {
         console.log("housing number", logements.length);
         for (const logement of logements) {
             await fetchAndCreateRooms(logement.housing_id);
+            await fetchSensorsAndLoad(logement.housing_id);
         }
     } catch (error) {
         console.error("Failed to fetch logements:", error);
+    }
+}
+
+
+
+
+async function fetchSensorsAndLoad(housing_id) {
+    try {
+        const response = await fetch(`/sensors/${housing_id}`);
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const sensors = JSON.parse(doc.querySelector('#sensor-data').textContent);
+        console.log("sensor number", sensors.length);
+        sensors.forEach(sensor => {
+            const gltfPath = `/static/models/sensor.glb`;
+
+            loader.load(gltfPath, (gltf) => {
+                const model = gltf.scene;
+                model.scale.set(0.01, 0.01, 0.01);
+
+                // Place sensor at the saved coordinates
+                model.position.set(sensor.x_coordinate || 0, sensor.y_coordinate || 0, sensor.z_coordinate || 0);
+
+                // Attach sensor metadata to the model
+                model.userData.sensorId = sensor.sensor_id;
+                model.userData.roomId = sensor.room_id;
+
+                scene.add(model);
+                console.log(`Loaded sensor at: ${model.position.toArray()}, Room ID: ${sensor.room_id}`);
+            });
+        });
+    } catch (error) {
+        console.error("Failed to fetch sensors:", error);
     }
 }
 
