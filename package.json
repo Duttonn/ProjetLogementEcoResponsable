@@ -9,22 +9,18 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    
     "create-venv": "python3 -m venv venv && echo 'Python virtual environment created'",
     "generate-requirements": "venv/bin/pip freeze > requirements.txt || echo 'Failed to generate requirements.txt'",
     "install-python": "venv/bin/pip install -r requirements.txt || echo 'requirements.txt not found'",
     "serv": "venv/bin/python main.py",
     "activate-venv": "source venv/bin/activate",
-    
     "postinstall": "npm run create-venv && npm run install-python && npm run generate-requirements",
-
     "clean-w": "rmdir /s /q dist",
     "create-venv-w": "python -m venv venv && echo Python virtual environment created",
     "generate-requirements-w": "venv\\Scripts\\pip freeze > requirements.txt || echo Failed to generate requirements.txt",
     "install-python-w": "venv\\Scripts\\pip install -r requirements.txt || echo requirements.txt not found",
-    "serv-w": "venv\\Scripts\\python main.py",
-    "activate-venv-w": "venv\\Scripts\\activate",
-
+    "serv-w": ".venv\\Scripts\\python.exe main.py",
+    "activate-venv-w": ".venv\\Scripts\\activate",
     "postinstall-w": "npm run create-venv-w && npm run install-python-w && npm run generate-requirements-w"
   },
   "devDependencies": {
